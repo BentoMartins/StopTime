@@ -207,6 +207,25 @@ class GameService:
         self._require_player(room, player_id)
         player_name = room["players"].get(player_id, "Um jogador")
         self._append_event(room, "system", f"{player_name} saiu da sala.", player_id)
+        room["players"].pop(player_id, None)
+        room["scores"].pop(player_id, None)
+        room["answers"].pop(player_id, None)
+        room["last_round_scores"].pop(player_id, None)
+        room["votes"] = {
+            vote_key: {
+                voter_id: valid
+                for voter_id, valid in votes.items()
+                if voter_id == "system" or voter_id != player_id
+            }
+            for vote_key, votes in room["votes"].items()
+            if not vote_key.startswith(f"{player_id}:")
+        }
+        if room.get("host_id") == player_id:
+            room["host_id"] = next(iter(room["players"]), None)
+        if room.get("stopped_by") == player_id:
+            room["stopped_by"] = None
+        if room.get("winner_id") == player_id:
+            room["winner_id"] = self._find_winner(room) if room["players"] else None
         await self.store.save_room(room)
         return room
 
