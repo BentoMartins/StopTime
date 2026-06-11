@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
     rabbitmq_exchange: str = "stop.events"
     rabbitmq_queue: str = "stop.events.audit"
+    cache_enabled: bool = True
+    cache_ttl: int = 3600
+    cache_prefix: str = "stop"
+    cache_fallback_enabled: bool = True
+    dsm_panel_enabled: bool = True
+    dsm_debug_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
