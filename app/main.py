@@ -158,7 +158,7 @@ async def submit_answers(room_id: str, request: SubmitAnswersRequest) -> dict[st
 
 @app.post("/api/v1/rooms/{room_id}/stop")
 async def stop_round(room_id: str, request: StopRoundRequest) -> dict[str, Any]:
-    room = await game_service.stop_round(room_id, request.player_id, request.answers)
+    room = await game_service.stop_round(room_id, request.player_id, request.answers, request.force)
     await emit_room_event("room.stopped", room)
     return {"data": room}
 

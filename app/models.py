@@ -43,6 +43,7 @@ class SubmitAnswersRequest(BaseModel):
 class StopRoundRequest(BaseModel):
     player_id: str
     answers: dict[str, str]
+    force: bool = False
 
 
 class VoteRequest(BaseModel):

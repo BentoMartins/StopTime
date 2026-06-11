@@ -202,15 +202,16 @@ async function submitAnswers(updateUi = true) {
   }
 }
 
-async function stopRound() {
+async function stopRound(force = false) {
   if (!ensureRoomAndPlayer()) return;
-  if (!hasFilledAllAnswers(state.room)) {
+  if (!force && !hasFilledAllAnswers(state.room)) {
     alert("Preencha todos os campos antes de pedir STOP.");
     return;
   }
   const response = await request(`/api/v1/rooms/${state.room.id}/stop`, "POST", {
     player_id: state.playerId,
     answers: collectAnswers(),
+    force,
   });
   setRoom(response.data);
 }
@@ -826,7 +827,7 @@ function startTimer(room) {
     const currentRemaining = getRemainingSeconds(room);
     if (currentRemaining === 0 && state.autoStopRound !== room.round_number) {
       state.autoStopRound = room.round_number;
-      runAction(stopRound, true);
+      runAction(() => stopRound(true), true);
     }
   };
 
