@@ -25,6 +25,39 @@ O servidor mantém o estado global da partida, as regras de rodada, as respostas
 | Mensageria com RabbitMQ | Publica eventos da aplicação, como `room.created`, `room.round_started`, `room.stopped` e `room.round_finished`. |
 | WebSocket | Atualiza todos os jogadores da sala em tempo real quando o estado muda. |
 
+### Cache-Aside / DSM
+
+O projeto usa Redis como camada distribuida para compartilhar o estado das salas entre chamadas da API. A fronteira dessa arquitetura fica em `app/redis_store.py`, mantendo `app/game.py` focado nas regras do Stop.
+
+Fluxo de leitura:
+
+1. `GameService` pede a sala para `RedisStore`.
+2. `RedisStore` tenta ler primeiro a chave `{CACHE_PREFIX}:room:{roomId}` no Redis.
+3. Em hit, a sala volta imediatamente para a aplicacao.
+4. Em miss, o store consulta a origem local resiliente em memoria.
+5. Apos uma leitura bem-sucedida da origem, o Redis e preenchido novamente com `CACHE_TTL`.
+6. Se o Redis estiver indisponivel, a API continua funcionando com fallback em memoria quando `CACHE_FALLBACK_ENABLED=true`.
+
+Variaveis suportadas:
+
+| Variavel | Padrao | Uso |
+| --- | --- | --- |
+| `REDIS_URL` | `redis://localhost:6379/0` | Conexao com Redis. |
+| `CACHE_ENABLED` | `true` | Liga/desliga a camada Redis. |
+| `CACHE_TTL` | `3600` | Tempo de vida das salas no cache, em segundos. |
+| `CACHE_PREFIX` | `stop` | Prefixo das chaves no Redis. |
+| `CACHE_FALLBACK_ENABLED` | `true` | Mantem fallback local em caso de miss/falha. |
+| `DSM_PANEL_ENABLED` | `true` | Habilita endpoints do painel dev/ops. |
+| `DSM_DEBUG_TOKEN` | vazio | Quando definido, exige header `X-Dsm-Token`. |
+
+Painel dev/ops:
+
+- Acesse `http://localhost:8000/?debug=1`.
+- O painel mostra status DSM, status Redis, latencia, hit/miss/erro, ultimas operacoes e horario da ultima atualizacao.
+- `Atualizar` recarrega o diagnostico.
+- `Forcar miss` faz a proxima leitura da sala ignorar o Redis e buscar a origem.
+- `Limpar cache` remove a chave Redis da sala atual.
+
 ## 3. Arquitetura
 
 ```mermaid
