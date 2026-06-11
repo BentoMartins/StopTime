@@ -241,6 +241,37 @@
           </div>
         </div>
       </div>
+
+      <aside id="devOpsPanel" class="devops-panel hidden" aria-live="polite">
+        <header>
+          <span>DSM / Cache</span>
+          <strong id="devDsmStatus">-</strong>
+        </header>
+        <div class="devops-grid">
+          <div>
+            <small>Redis</small>
+            <b id="devRedisStatus">-</b>
+          </div>
+          <div>
+            <small>Latencia</small>
+            <b id="devRedisLatency">-</b>
+          </div>
+          <div>
+            <small>Ultima leitura</small>
+            <b id="devCacheState">-</b>
+          </div>
+          <div>
+            <small>Operacoes</small>
+            <b id="devOpsCount">0</b>
+          </div>
+        </div>
+        <div class="devops-actions">
+          <button id="devRefreshBtn" class="secondary" type="button">Atualizar</button>
+          <button id="devForceMissBtn" class="secondary" type="button">Forcar miss</button>
+          <button id="devClearCacheBtn" class="danger" type="button">Limpar cache</button>
+        </div>
+        <div id="devDiagnostics" class="devops-diagnostics"></div>
+      </aside>
     </main>
 
     <script src="/static/app.js"></script>

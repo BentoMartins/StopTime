@@ -59,6 +59,11 @@
     align-items: stretch;
     display: grid;
   }
+
+  .devops-grid,
+  .devops-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -94,5 +99,18 @@
   .chips,
   .chips.compact {
     min-height: auto;
+  }
+
+  .devops-panel {
+    bottom: 0.75rem;
+    left: 0.75rem;
+    max-width: none;
+    right: 0.75rem;
+    width: auto;
+  }
+
+  .devops-grid,
+  .devops-actions {
+    grid-template-columns: 1fr;
   }
 }
