@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Header, HTTPException, FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.rabbitmq import RabbitPublisher
 from app.redis_store import RedisStore
+from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 
@@ -98,6 +99,26 @@ async def create_room(request: CreateRoomRequest) -> dict[str, Any]:
 async def get_room(room_id: str) -> dict[str, Any]:
     room = await game_service.require_room(room_id)
     return {"data": room}
+
+
+@app.get("/api/v1/dev/cache/status")
+async def cache_status(x_dsm_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_dev_panel_access(x_dsm_token)
+    return {"data": await store.diagnostics()}
+
+
+@app.post("/api/v1/dev/cache/clear")
+async def clear_cache(room_id: str | None = None, x_dsm_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_dev_panel_access(x_dsm_token)
+    deleted = await store.clear_cache(room_id)
+    return {"deleted": deleted, "roomId": room_id.upper() if room_id else None}
+
+
+@app.post("/api/v1/dev/cache/force-miss/{room_id}")
+async def force_cache_miss(room_id: str, x_dsm_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_dev_panel_access(x_dsm_token)
+    store.force_miss(room_id)
+    return {"roomId": room_id.upper(), "nextRead": "forced_miss"}
 
 
 @app.post("/api/v1/rooms/{room_id}/players", status_code=201)
@@ -196,3 +217,10 @@ async def emit_room_event(event_type: str, room: dict[str, Any], extra: dict[str
 
     await rabbit.publish(event_type, payload)
     await manager.broadcast(room["id"], {"type": event_type, "data": room, **(extra or {})})
+
+
+def require_dev_panel_access(token: str | None) -> None:
+    if not settings.dsm_panel_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Painel DSM desabilitado.")
+    if settings.dsm_debug_token and token != settings.dsm_debug_token:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Token DSM invalido.")
