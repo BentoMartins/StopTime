@@ -19,6 +19,8 @@ const state = {
   lastStatus: null,
   stopModalRound: null,
   saveTimeout: null,
+  debugPanel: new URLSearchParams(window.location.search).get("debug") === "1"
+    || localStorage.getItem("stop.debugPanel") === "true",
 };
 
 const elements = {
@@ -71,6 +73,16 @@ const elements = {
   closeStopModalBtn: document.querySelector("#closeStopModalBtn"),
   cancelLeaveRoomBtn: document.querySelector("#cancelLeaveRoomBtn"),
   confirmLeaveRoomBtn: document.querySelector("#confirmLeaveRoomBtn"),
+  devOpsPanel: document.querySelector("#devOpsPanel"),
+  devDsmStatus: document.querySelector("#devDsmStatus"),
+  devRedisStatus: document.querySelector("#devRedisStatus"),
+  devRedisLatency: document.querySelector("#devRedisLatency"),
+  devCacheState: document.querySelector("#devCacheState"),
+  devOpsCount: document.querySelector("#devOpsCount"),
+  devRefreshBtn: document.querySelector("#devRefreshBtn"),
+  devForceMissBtn: document.querySelector("#devForceMissBtn"),
+  devClearCacheBtn: document.querySelector("#devClearCacheBtn"),
+  devDiagnostics: document.querySelector("#devDiagnostics"),
 };
 
 elements.createRoomBtn.addEventListener("click", () => runAction(createRoom));
@@ -83,6 +95,9 @@ elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
 elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom));
 elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode));
+elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel));
+elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss));
+elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache));
 elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
 elements.categoryInput.addEventListener("keydown", (event) => addChipOnEnter(event, addCategory));
@@ -95,6 +110,7 @@ window.addEventListener("beforeunload", notifyPlayerLeft);
 renderConfigChips();
 applyRoomCodeFromUrl();
 updateEntryQrCode();
+initDevOpsPanel();
 
 async function createRoom() {
   const hostName = requirePlayerName();
@@ -236,6 +252,10 @@ async function request(url, method = "GET", body) {
     method,
     headers: { "Content-Type": "application/json" },
   };
+  const dsmToken = localStorage.getItem("stop.dsmToken");
+  if (dsmToken) {
+    options.headers["X-Dsm-Token"] = dsmToken;
+  }
   if (body) {
     options.body = JSON.stringify(body);
   }
@@ -301,6 +321,7 @@ function render() {
   updateButtons(room);
   startTimer(room);
   startReviewTimer(room);
+  refreshDevOpsPanel(true);
 }
 
 function renderCurrentView(room) {
@@ -926,11 +947,75 @@ function scheduleAutoSave() {
 async function runAction(action, silent = false) {
   try {
     await action();
+    refreshDevOpsPanel(true);
   } catch (error) {
     if (!silent) {
       alert(error.message);
     }
   }
+}
+
+function initDevOpsPanel() {
+  if (!state.debugPanel) {
+    return;
+  }
+  localStorage.setItem("stop.debugPanel", "true");
+  elements.devOpsPanel.classList.remove("hidden");
+  refreshDevOpsPanel(true);
+}
+
+async function refreshDevOpsPanel(silent = false) {
+  if (!state.debugPanel) {
+    return;
+  }
+  try {
+    const response = await request("/api/v1/dev/cache/status");
+    renderDevOpsPanel(response.data);
+  } catch (error) {
+    if (!silent) {
+      throw error;
+    }
+  }
+}
+
+function renderDevOpsPanel(data) {
+  const lastOperation = data.operations?.[0];
+  elements.devDsmStatus.textContent = formatDsmStatus(data.dsm.status);
+  elements.devRedisStatus.textContent = formatDsmStatus(data.redis.status);
+  elements.devRedisLatency.textContent = data.redis.latencyMs === null ? "-" : `${data.redis.latencyMs}ms`;
+  elements.devCacheState.textContent = data.dsm.lastCacheStatus || "-";
+  elements.devOpsCount.textContent = String(data.operations?.length || 0);
+
+  elements.devDiagnostics.innerHTML = `
+    <small>Diagnostico</small>
+    <div>TTL: ${data.cache.ttl}s | Prefixo: ${escapeHtml(data.cache.prefix)}</div>
+    <div>Hit/Miss/Erro: ${data.stats.hits}/${data.stats.misses}/${data.stats.errors}</div>
+    <div>Fallbacks: ${data.stats.fallbacks} | Salas na origem local: ${data.cache.originRooms}</div>
+    <div>Ultima operacao: ${lastOperation ? escapeHtml(lastOperation.action) : "-"} (${lastOperation ? escapeHtml(lastOperation.result) : "-"})</div>
+    <div>Cache ms: ${lastOperation?.cacheMs ?? "-"} | Origem ms: ${lastOperation?.originMs ?? "-"}</div>
+    <div>Atualizado em: ${data.dsm.lastUpdatedAt ? new Date(data.dsm.lastUpdatedAt * 1000).toLocaleTimeString("pt-BR") : "-"}</div>
+  `;
+}
+
+async function clearRoomCache() {
+  const roomQuery = state.room?.id ? `?room_id=${encodeURIComponent(state.room.id)}` : "";
+  const response = await request(`/api/v1/dev/cache/clear${roomQuery}`, "POST");
+  alert(response.deleted ? "Cache limpo." : "Nenhuma chave de cache removida.");
+}
+
+async function forceCacheMiss() {
+  if (!state.room?.id) {
+    alert("Entre em uma sala para forcar miss.");
+    return;
+  }
+  await request(`/api/v1/dev/cache/force-miss/${state.room.id}`, "POST");
+  const response = await request(`/api/v1/rooms/${state.room.id}`);
+  setRoom(response.data);
+  await refreshDevOpsPanel();
+}
+
+function formatDsmStatus(value) {
+  return String(value || "-").replaceAll("_", " ");
 }
 
 function requirePlayerName() {

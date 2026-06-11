@@ -471,6 +471,95 @@
   box-shadow: none;
 }
 
+.devops-panel {
+  background: rgb(2 20 65 / 96%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  bottom: 1rem;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 34%);
+  color: var(--text);
+  display: grid;
+  gap: 0.8rem;
+  max-width: min(520px, calc(100vw - 2rem));
+  padding: 1rem;
+  position: fixed;
+  right: 1rem;
+  width: 520px;
+  z-index: 9;
+}
+
+.devops-panel.hidden {
+  display: none;
+}
+
+.devops-panel header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.devops-panel header span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.devops-panel header strong {
+  color: #18f2c3;
+  font-size: 0.95rem;
+}
+
+.devops-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.devops-grid div,
+.devops-diagnostics {
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.devops-grid small,
+.devops-diagnostics small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.devops-grid b {
+  display: block;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.devops-actions {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.devops-actions button {
+  border-radius: 12px;
+  box-shadow: none;
+  font-size: 0.82rem;
+  padding: 0.65rem 0.55rem;
+}
+
+.devops-diagnostics {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  max-height: 170px;
+  overflow: auto;
+}
+
 @keyframes pop {
   from {
     opacity: 0;
