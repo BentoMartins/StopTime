@@ -214,11 +214,16 @@
       </section>
 
       <section id="podiumView" class="view">
-        <article class="card">
+        <article class="card podium-card">
           <p class="step">Etapa 6</p>
           <h2 id="podiumTitle">Podium da rodada</h2>
+          <p id="podiumSubtitle" class="podium-subtitle">Confira a pontuacao e escolha o proximo passo.</p>
           <div id="podiumList" class="podium"></div>
-          <button id="newRoundBtn">Nova rodada</button>
+          <div class="podium-actions">
+            <button id="newRoundBtn">Nova rodada</button>
+            <button id="playAgainBtn" class="secondary" type="button">Jogar novamente</button>
+            <button id="backToStartBtn" class="secondary" type="button">Voltar ao inicio</button>
+          </div>
         </article>
       </section>
 

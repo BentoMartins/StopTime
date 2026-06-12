@@ -61,6 +61,7 @@ const elements = {
   reviewCategoryTitle: document.querySelector("#reviewCategoryTitle"),
   reviewTimer: document.querySelector("#reviewTimer"),
   podiumTitle: document.querySelector("#podiumTitle"),
+  podiumSubtitle: document.querySelector("#podiumSubtitle"),
   podiumList: document.querySelector("#podiumList"),
   stopModal: document.querySelector("#stopModal"),
   stopMessage: document.querySelector("#stopMessage"),
@@ -72,6 +73,8 @@ const elements = {
   startRoundBtn: document.querySelector("#startRoundBtn"),
   stopBtn: document.querySelector("#stopBtn"),
   newRoundBtn: document.querySelector("#newRoundBtn"),
+  playAgainBtn: document.querySelector("#playAgainBtn"),
+  backToStartBtn: document.querySelector("#backToStartBtn"),
   closeStopModalBtn: document.querySelector("#closeStopModalBtn"),
   cancelLeaveRoomBtn: document.querySelector("#cancelLeaveRoomBtn"),
   confirmLeaveRoomBtn: document.querySelector("#confirmLeaveRoomBtn"),
@@ -94,6 +97,8 @@ elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom));
 elements.startRoundBtn.addEventListener("click", () => runAction(startRound));
 elements.stopBtn.addEventListener("click", () => runAction(stopRound));
 elements.newRoundBtn.addEventListener("click", () => runAction(startRound));
+elements.playAgainBtn.addEventListener("click", () => runAction(playAgain));
+elements.backToStartBtn.addEventListener("click", goBackToStart);
 elements.closeStopModalBtn.addEventListener("click", hideStopModal);
 elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
@@ -520,7 +525,11 @@ function renderPodium(room) {
     .sort((first, second) => second.total - first.total);
 
   const winnerName = room.winner_id ? room.players[room.winner_id] : null;
+  const isGameOver = Boolean(room.winner_id);
   elements.podiumTitle.textContent = winnerName ? `${winnerName} venceu a sala!` : "Podium da rodada";
+  elements.podiumSubtitle.textContent = isGameOver
+    ? "A partida terminou. Comece uma nova sala ou volte ao inicio para entrar em outra."
+    : "Rodada concluida. O dono da sala pode iniciar a proxima rodada.";
   elements.podiumList.innerHTML = "";
 
   podium.forEach((player, index) => {
@@ -533,6 +542,28 @@ function renderPodium(room) {
     `;
     elements.podiumList.append(item);
   });
+}
+
+async function playAgain() {
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  clearSavedSession();
+  const playerName = elements.playerName.value.trim() || state.room?.players?.[state.playerId] || "";
+  if (playerName) {
+    elements.playerName.value = playerName;
+  }
+  await createRoom();
+}
+
+function goBackToStart() {
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  clearSavedSession();
+  render();
 }
 
 async function sendChatMessage(event) {
@@ -609,7 +640,10 @@ function updateButtons(room) {
   elements.stopBtn.disabled = !canStop;
   elements.stopBtn.title = canStop ? "" : "Preencha todos os campos antes de pedir STOP.";
   elements.newRoundBtn.disabled = !isHost || Boolean(room.winner_id);
+  elements.newRoundBtn.hidden = Boolean(room.winner_id);
   elements.newRoundBtn.title = isHost ? "" : "Apenas o dono da sala pode começar rodadas.";
+  elements.playAgainBtn.hidden = !room.winner_id;
+  elements.backToStartBtn.hidden = !room.winner_id;
 }
 
 function collectAnswers() {

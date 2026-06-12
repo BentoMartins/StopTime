@@ -369,6 +369,21 @@
   gap: 0.85rem;
 }
 
+.podium-card {
+  align-content: start;
+  display: grid;
+  gap: 1rem;
+  min-height: 520px;
+}
+
+.podium-subtitle {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.45;
+  margin: -0.4rem 0 0.25rem;
+  max-width: 680px;
+}
+
 .podium-item {
   align-items: center;
   background: var(--surface-muted);
@@ -406,6 +421,17 @@
 
 .podium-item small {
   color: var(--muted);
+}
+
+.podium-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.podium-actions button {
+  min-width: 170px;
 }
 
 .modal {
