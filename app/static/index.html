@@ -9,6 +9,7 @@
   </head>
   <body>
     <main class="app">
+      <div id="connectionStatus" class="connection-status hidden" role="status" aria-live="polite"></div>
       <section id="entryView" class="view active">
         <article class="card centered-card entry-card">
           <div class="entry-logo">
@@ -28,14 +29,14 @@
           <div class="entry-divider"><span>ou</span></div>
 
           <div class="join-row">
-            <input id="roomCodeInput" placeholder="Codigo da sala" maxlength="6" />
+            <input id="roomCodeInput" placeholder="Código da sala" maxlength="6" />
             <button id="joinRoomBtn" class="secondary">Entrar</button>
           </div>
 
           <div class="entry-qr-card">
             <span>Entrar pelo celular</span>
             <img id="roomQrCode" alt="QR Code para entrar na sala pelo celular" />
-            <small id="roomQrHint">Digite um codigo de sala para gerar o QR Code.</small>
+            <small id="roomQrHint">Digite um código de sala para gerar o QR Code.</small>
           </div>
         </article>
       </section>
@@ -48,9 +49,9 @@
             </button>
             <img class="lobby-logo" src="/assets/stop-time-icon.png" alt="Stop Online" />
             <div class="room-code">
-              <span>Codigo</span>
+              <span>Código</span>
               <strong id="lobbyRoomCode">-</strong>
-              <button id="copyRoomCodeBtn" type="button" aria-label="Copiar codigo da sala" title="Copiar codigo">
+              <button id="copyRoomCodeBtn" type="button" aria-label="Copiar código da sala" title="Copiar código">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M8 8h10v12H8z" />
                   <path d="M6 16H4V4h12v2" />
@@ -139,7 +140,7 @@
           </div>
 
           <footer class="lobby-start-card">
-            <button id="startRoundBtn">Comecar rodada</button>
+            <button id="startRoundBtn">Começar rodada</button>
           </footer>
         </article>
       </section>
@@ -170,7 +171,12 @@
         </article>
 
         <aside class="game-panel chat-panel">
-          <h2>Chat e logs</h2>
+          <h2>Eventos</h2>
+          <div class="log-tabs" role="tablist" aria-label="Filtrar eventos">
+            <button class="logFilter active" type="button" data-filter="all">Todos</button>
+            <button class="logFilter" type="button" data-filter="system">Sistema</button>
+            <button class="logFilter" type="button" data-filter="chat">Chat</button>
+          </div>
           <div class="activityLog activity-log"></div>
           <form class="chatForm chat-form">
             <input class="chatInput" placeholder="Converse aqui..." maxlength="180" />
@@ -187,24 +193,29 @@
 
         <article class="card game-center">
           <div class="game-topbar">
-            <span>Conferencia</span>
+            <span>Conferência</span>
             <div class="letter-badge">
               <small>Letra</small>
               <strong class="reviewLetter">-</strong>
             </div>
           </div>
           <div class="review-content">
-            <h2>Conferencia por categoria</h2>
+            <h2>Conferência por categoria</h2>
             <div class="review-header">
               <strong id="reviewCategoryTitle">Categoria</strong>
-              <span class="review-timer">Proxima em <b id="reviewTimer">20s</b></span>
+              <span class="review-timer">Próxima em <b id="reviewTimer">20s</b></span>
             </div>
             <div id="votesPanel" class="votes"></div>
           </div>
         </article>
 
         <aside class="game-panel chat-panel">
-          <h2>Chat e logs</h2>
+          <h2>Eventos</h2>
+          <div class="log-tabs" role="tablist" aria-label="Filtrar eventos">
+            <button class="logFilter active" type="button" data-filter="all">Todos</button>
+            <button class="logFilter" type="button" data-filter="system">Sistema</button>
+            <button class="logFilter" type="button" data-filter="chat">Chat</button>
+          </div>
           <div class="activityLog activity-log"></div>
           <form class="chatForm chat-form">
             <input class="chatInput" placeholder="Converse aqui..." maxlength="180" />
@@ -216,13 +227,44 @@
       <section id="podiumView" class="view">
         <article class="card podium-card">
           <p class="step">Etapa 6</p>
-          <h2 id="podiumTitle">Podium da rodada</h2>
-          <p id="podiumSubtitle" class="podium-subtitle">Confira a pontuacao e escolha o proximo passo.</p>
+          <h2 id="podiumTitle">Pódio da rodada</h2>
+          <p id="podiumSubtitle" class="podium-subtitle">Confira a pontuação e escolha o próximo passo.</p>
+          <div id="podiumSummary" class="podium-summary"></div>
           <div id="podiumList" class="podium"></div>
           <div class="podium-actions">
             <button id="newRoundBtn">Nova rodada</button>
+            <button id="shareResultBtn" class="secondary" type="button">Compartilhar resultado</button>
             <button id="playAgainBtn" class="secondary" type="button">Jogar novamente</button>
-            <button id="backToStartBtn" class="secondary" type="button">Voltar ao inicio</button>
+            <button id="backToStartBtn" class="secondary" type="button">Voltar ao início</button>
+          </div>
+        </article>
+      </section>
+
+      <section id="demoView" class="view">
+        <article class="card demo-card">
+          <p class="step">Modo apresentação</p>
+          <h2>Arquitetura do Stop Online</h2>
+          <p class="podium-subtitle">Fluxo usado na defesa: API FastAPI centraliza regras, Redis compartilha estado, RabbitMQ audita eventos e WebSocket atualiza os jogadores em tempo real.</p>
+          <div class="demo-grid">
+            <section>
+              <strong>Redis / cache</strong>
+              <p>As salas ficam em chaves <code>stop:room:{id}</code>. A API tenta cache primeiro, registra hit/miss/erro e usa origem em memória como fallback quando configurado.</p>
+            </section>
+            <section>
+              <strong>RabbitMQ</strong>
+              <p>Eventos <code>room.*</code> são publicados em tópico e consumidos pela fila de auditoria <code>stop.events.audit</code>.</p>
+            </section>
+            <section>
+              <strong>WebSocket</strong>
+              <p>Cada mudança relevante dispara broadcast para os sockets conectados e mantém lobby, rodada, votação e pódio sincronizados.</p>
+            </section>
+            <section>
+              <strong>Fluxo da aplicação</strong>
+              <p>Criar sala, entrar jogadores, configurar temas/letras, iniciar rodada, enviar respostas, pedir STOP, votar, calcular pontuação e declarar vencedor.</p>
+            </section>
+          </div>
+          <div class="podium-actions">
+            <button id="demoBackBtn" type="button">Abrir jogo</button>
           </div>
         </article>
       </section>
@@ -270,11 +312,11 @@
             <b id="devRedisStatus">-</b>
           </div>
           <div>
-            <small>Latencia</small>
+            <small>Latência</small>
             <b id="devRedisLatency">-</b>
           </div>
           <div>
-            <small>Ultima leitura</small>
+            <small>Última leitura</small>
             <b id="devCacheState">-</b>
           </div>
           <div>
@@ -284,13 +326,16 @@
         </div>
         <div class="devops-actions">
           <button id="devRefreshBtn" class="secondary" type="button">Atualizar</button>
-          <button id="devForceMissBtn" class="secondary" type="button">Forcar miss</button>
+          <button id="devCopyDiagnosticsBtn" class="secondary" type="button">Copiar diagnóstico</button>
+          <button id="devForceMissBtn" class="secondary" type="button">Forçar miss</button>
           <button id="devClearCacheBtn" class="danger" type="button">Limpar cache</button>
         </div>
         <div id="devDiagnostics" class="devops-diagnostics"></div>
+        <div id="devEvents" class="devops-events"></div>
       </aside>
     </main>
 
     <script src="/static/app.js"></script>
   </body>
 </html>
+

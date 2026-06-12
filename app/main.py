@@ -43,14 +43,25 @@ rabbit = RabbitPublisher()
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: dict[str, list[WebSocket]] = defaultdict(list)
+        self.connection_players: dict[WebSocket, str | None] = {}
 
-    async def connect(self, room_id: str, websocket: WebSocket) -> None:
+    async def connect(self, room_id: str, websocket: WebSocket, player_id: str | None = None) -> None:
         await websocket.accept()
         self.active_connections[room_id].append(websocket)
+        self.connection_players[websocket] = player_id
 
     def disconnect(self, room_id: str, websocket: WebSocket) -> None:
         if websocket in self.active_connections[room_id]:
             self.active_connections[room_id].remove(websocket)
+        self.connection_players.pop(websocket, None)
+
+    def presence(self, room_id: str) -> dict[str, str]:
+        online_players = {
+            player_id
+            for websocket in self.active_connections[room_id]
+            if (player_id := self.connection_players.get(websocket))
+        }
+        return {player_id: "online" for player_id in online_players}
 
     async def broadcast(self, room_id: str, message: dict[str, Any]) -> None:
         disconnected: list[WebSocket] = []
@@ -83,6 +94,11 @@ async def index() -> FileResponse:
     return FileResponse("app/static/index.html")
 
 
+@app.get("/demo")
+async def demo() -> FileResponse:
+    return FileResponse("app/static/index.html")
+
+
 @app.get("/assets/stop-time-icon.png")
 async def stop_time_icon() -> FileResponse:
     return FileResponse("app/stopTimeIcon.png")
@@ -104,7 +120,9 @@ async def get_room(room_id: str) -> dict[str, Any]:
 @app.get("/api/v1/dev/cache/status")
 async def cache_status(x_dsm_token: str | None = Header(default=None)) -> dict[str, Any]:
     require_dev_panel_access(x_dsm_token)
-    return {"data": await store.diagnostics()}
+    data = await store.diagnostics()
+    data["rabbitmq"] = rabbit.diagnostics()
+    return {"data": data}
 
 
 @app.post("/api/v1/dev/cache/clear")
@@ -198,16 +216,22 @@ async def finish_round(room_id: str, request: StartRoundRequest) -> dict[str, An
 
 
 @app.websocket("/ws/rooms/{room_id}")
-async def room_socket(room_id: str, websocket: WebSocket) -> None:
+async def room_socket(room_id: str, websocket: WebSocket, player_id: str | None = None) -> None:
     normalized_room_id = room_id.upper()
-    await manager.connect(normalized_room_id, websocket)
+    await manager.connect(normalized_room_id, websocket, player_id)
     try:
         room = await game_service.require_room(normalized_room_id)
-        await websocket.send_json({"type": "room.snapshot", "data": room})
+        await websocket.send_json({"type": "room.snapshot", "data": with_presence(room)})
+        await manager.broadcast(normalized_room_id, {"type": "room.presence", "data": with_presence(room)})
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(normalized_room_id, websocket)
+        try:
+            room = await game_service.require_room(normalized_room_id)
+            await manager.broadcast(normalized_room_id, {"type": "room.presence", "data": with_presence(room)})
+        except HTTPException:
+            return
 
 
 async def emit_room_event(event_type: str, room: dict[str, Any], extra: dict[str, Any] | None = None) -> None:
@@ -216,7 +240,15 @@ async def emit_room_event(event_type: str, room: dict[str, Any], extra: dict[str
         payload.update(extra)
 
     await rabbit.publish(event_type, payload)
-    await manager.broadcast(room["id"], {"type": event_type, "data": room, **(extra or {})})
+    await manager.broadcast(room["id"], {"type": event_type, "data": with_presence(room), **(extra or {})})
+
+
+def with_presence(room: dict[str, Any]) -> dict[str, Any]:
+    enriched_room = dict(room)
+    presence = {player_id: "offline" for player_id in room.get("players", {})}
+    presence.update(manager.presence(room["id"]))
+    enriched_room["presence"] = presence
+    return enriched_room
 
 
 def require_dev_panel_access(token: str | None) -> None:

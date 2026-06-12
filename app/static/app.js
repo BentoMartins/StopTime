@@ -24,14 +24,22 @@ const state = {
   loadingCount: 0,
   debugPanel: getDebugPanelPreference(),
   devOpsPanelOpen: localStorage.getItem("stop.debugPanelOpen") === "true",
+  reconnectAttempts: 0,
+  reconnectTimer: null,
+  socketClosedByUser: false,
+  socketStatus: "offline",
+  logFilter: "all",
+  lastDevOpsData: null,
 };
 
 const elements = {
+  connectionStatus: document.querySelector("#connectionStatus"),
   entryView: document.querySelector("#entryView"),
   lobbyView: document.querySelector("#lobbyView"),
   roundView: document.querySelector("#roundView"),
   reviewView: document.querySelector("#reviewView"),
   podiumView: document.querySelector("#podiumView"),
+  demoView: document.querySelector("#demoView"),
   playerName: document.querySelector("#playerName"),
   roomCodeInput: document.querySelector("#roomCodeInput"),
   roomQrCode: document.querySelector("#roomQrCode"),
@@ -63,6 +71,7 @@ const elements = {
   reviewTimer: document.querySelector("#reviewTimer"),
   podiumTitle: document.querySelector("#podiumTitle"),
   podiumSubtitle: document.querySelector("#podiumSubtitle"),
+  podiumSummary: document.querySelector("#podiumSummary"),
   podiumList: document.querySelector("#podiumList"),
   stopModal: document.querySelector("#stopModal"),
   stopMessage: document.querySelector("#stopMessage"),
@@ -76,8 +85,10 @@ const elements = {
   startRoundBtn: document.querySelector("#startRoundBtn"),
   stopBtn: document.querySelector("#stopBtn"),
   newRoundBtn: document.querySelector("#newRoundBtn"),
+  shareResultBtn: document.querySelector("#shareResultBtn"),
   playAgainBtn: document.querySelector("#playAgainBtn"),
   backToStartBtn: document.querySelector("#backToStartBtn"),
+  demoBackBtn: document.querySelector("#demoBackBtn"),
   closeStopModalBtn: document.querySelector("#closeStopModalBtn"),
   cancelLeaveRoomBtn: document.querySelector("#cancelLeaveRoomBtn"),
   confirmLeaveRoomBtn: document.querySelector("#confirmLeaveRoomBtn"),
@@ -90,9 +101,12 @@ const elements = {
   devCacheState: document.querySelector("#devCacheState"),
   devOpsCount: document.querySelector("#devOpsCount"),
   devRefreshBtn: document.querySelector("#devRefreshBtn"),
+  devCopyDiagnosticsBtn: document.querySelector("#devCopyDiagnosticsBtn"),
   devForceMissBtn: document.querySelector("#devForceMissBtn"),
   devClearCacheBtn: document.querySelector("#devClearCacheBtn"),
   devDiagnostics: document.querySelector("#devDiagnostics"),
+  devEvents: document.querySelector("#devEvents"),
+  logFilters: document.querySelectorAll(".logFilter"),
 };
 
 elements.createRoomBtn.addEventListener("click", () => runAction(createRoom, false, "Criando sala..."));
@@ -100,17 +114,20 @@ elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom, false, 
 elements.startRoundBtn.addEventListener("click", () => runAction(startRound, false, "Iniciando rodada..."));
 elements.stopBtn.addEventListener("click", () => runAction(stopRound, false, "Enviando STOP..."));
 elements.newRoundBtn.addEventListener("click", () => runAction(startRound, false, "Preparando rodada..."));
+elements.shareResultBtn.addEventListener("click", () => runAction(shareResult, false, "Preparando resultado..."));
 elements.playAgainBtn.addEventListener("click", () => runAction(playAgain, false, "Criando nova sala..."));
 elements.backToStartBtn.addEventListener("click", goBackToStart);
+elements.demoBackBtn.addEventListener("click", () => window.location.assign("/"));
 elements.closeStopModalBtn.addEventListener("click", hideStopModal);
 elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
 elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom, false, "Saindo da sala..."));
-elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode, false, "Copiando codigo..."));
+elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode, false, "Copiando código..."));
 elements.devOpsToggle.addEventListener("click", () => setDevOpsPanelOpen(!state.devOpsPanelOpen));
 elements.devOpsCloseBtn.addEventListener("click", () => setDevOpsPanelOpen(false));
-elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel, false, "Atualizando diagnostico..."));
-elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss, false, "Forcando cache miss..."));
+elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel, false, "Atualizando diagnóstico..."));
+elements.devCopyDiagnosticsBtn.addEventListener("click", () => runAction(copyDiagnostics, false, "Copiando diagnóstico..."));
+elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss, false, "Forçando cache miss..."));
 elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache, false, "Limpando cache..."));
 elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
@@ -119,12 +136,22 @@ elements.roomCodeInput.addEventListener("input", updateEntryQrCode);
 elements.maxRoundsInput.addEventListener("input", updateMaxRounds);
 elements.roundDurationInput.addEventListener("input", updateRoundDuration);
 elements.chatForms.forEach((form) => form.addEventListener("submit", sendChatMessage));
+elements.logFilters.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.logFilter = button.dataset.filter || "all";
+    renderActivity(state.room);
+  });
+});
 
 renderConfigChips();
 applyRoomCodeFromUrl();
 updateEntryQrCode();
 initDevOpsPanel();
-restoreSavedRoom();
+if (window.location.pathname === "/demo") {
+  showView("demo");
+} else {
+  restoreSavedRoom();
+}
 
 async function createRoom() {
   const hostName = requirePlayerName();
@@ -144,7 +171,7 @@ async function createRoom() {
 async function joinRoom() {
   const roomId = elements.roomCodeInput.value.trim().toUpperCase();
   if (!roomId) {
-    alert("Informe o codigo da sala.");
+    alert("Informe o código da sala.");
     return;
   }
 
@@ -197,7 +224,7 @@ function updateEntryQrCode() {
     elements.roomQrHint.textContent = `Escaneie para abrir a sala ${roomId} no celular.`;
   } else {
     url.searchParams.delete("room");
-    elements.roomQrHint.textContent = "Digite um codigo de sala para gerar o QR Code.";
+    elements.roomQrHint.textContent = "Digite um código de sala para gerar o QR Code.";
   }
   elements.roomQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=FFFFFF&bgcolor=052268&margin=12&data=${encodeURIComponent(url.toString())}`;
 }
@@ -275,16 +302,77 @@ async function finishRound() {
 }
 
 function connectSocket(roomId) {
+  clearTimeout(state.reconnectTimer);
+  state.socketClosedByUser = false;
   if (state.socket) {
+    state.socket.onclose = null;
     state.socket.close();
   }
 
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}`);
+  const playerQuery = state.playerId ? `?player_id=${encodeURIComponent(state.playerId)}` : "";
+  state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}${playerQuery}`);
+  setSocketStatus(state.reconnectAttempts > 0 ? "reconnecting" : "connecting");
+  state.socket.onopen = () => {
+    state.reconnectAttempts = 0;
+    setSocketStatus("online");
+  };
   state.socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     setRoom(message.data);
   };
+  state.socket.onerror = () => {
+    setSocketStatus("reconnecting");
+  };
+  state.socket.onclose = () => {
+    if (state.socketClosedByUser || !state.roomId || !state.playerId) {
+      setSocketStatus("offline");
+      return;
+    }
+    scheduleReconnect();
+  };
+}
+
+function closeSocketIntentionally() {
+  clearTimeout(state.reconnectTimer);
+  state.socketClosedByUser = true;
+  if (state.socket) {
+    state.socket.onclose = null;
+    state.socket.close();
+    state.socket = null;
+  }
+  state.socketClosedByUser = false;
+  setSocketStatus("offline");
+}
+
+function scheduleReconnect() {
+  state.reconnectAttempts += 1;
+  setSocketStatus("reconnecting");
+  const delay = Math.min(1000 * state.reconnectAttempts, 6000);
+  clearTimeout(state.reconnectTimer);
+  state.reconnectTimer = setTimeout(() => {
+    if (state.roomId && state.playerId) {
+      connectSocket(state.roomId);
+    }
+  }, delay);
+}
+
+function setSocketStatus(status) {
+  state.socketStatus = status;
+  if (!elements.connectionStatus) {
+    return;
+  }
+
+  const labels = {
+    connecting: "Conectando...",
+    online: "Conectado em tempo real",
+    reconnecting: "Reconectando...",
+    offline: "Tempo real desconectado",
+  };
+
+  elements.connectionStatus.textContent = labels[status] || "";
+  elements.connectionStatus.className = `connection-status ${status}`;
+  elements.connectionStatus.classList.toggle("hidden", status === "offline" || status === "online");
 }
 
 async function request(url, method = "GET", body) {
@@ -407,9 +495,13 @@ function renderPlayers(room, container) {
   container.innerHTML = "";
   Object.entries(room.players).forEach(([playerId, name]) => {
     const item = document.createElement("div");
-    item.className = "player";
+    const online = isPlayerOnline(room, playerId);
+    item.className = `player ${online ? "online" : "offline"}`;
     item.innerHTML = `
-      ${renderPlayerName(name, playerId === room.host_id)}
+      <div>
+        ${renderPlayerName(name, playerId === room.host_id)}
+        <small>${online ? "online" : "offline"}</small>
+      </div>
       <span>${room.scores[playerId] || 0} pts</span>
     `;
     container.append(item);
@@ -421,13 +513,15 @@ function renderParticipants(room) {
     container.innerHTML = "";
     Object.entries(room.players).forEach(([playerId, name]) => {
       const item = document.createElement("div");
-      item.className = "participant";
+      const online = isPlayerOnline(room, playerId);
       const ready = isPlayerReady(room, playerId);
+      const readyLabel = getPlayerProgressLabel(room, playerId, ready);
+      item.className = `participant ${online ? "online" : "offline"}`;
       item.innerHTML = `
         <div class="participant-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div>
         <div>
           ${renderPlayerName(name, playerId === room.host_id)}
-          <small>${room.scores[playerId] || 0} pts</small>
+          <small>${room.scores[playerId] || 0} pts · ${readyLabel} · ${online ? "online" : "offline"}</small>
         </div>
         <span class="ready-check ${ready ? "active" : ""}">✓</span>
       `;
@@ -436,6 +530,19 @@ function renderParticipants(room) {
   });
 }
 
+function isPlayerOnline(room, playerId) {
+  return (room.presence?.[playerId] || "offline") === "online";
+}
+
+function getPlayerProgressLabel(room, playerId, ready) {
+  if (room.status === "playing") {
+    return ready ? "respondeu" : "respondendo";
+  }
+  if (room.status === "voting") {
+    return ready ? "votou" : "votando";
+  }
+  return ready ? "pronto" : "aguardando";
+}
 function renderPlayerName(name, isHost) {
   const crown = isHost
     ? `
@@ -470,15 +577,42 @@ function isPlayerReady(room, playerId) {
 }
 
 function renderActivity(room) {
-  const events = room.events || [];
+  const events = room?.events || [];
   elements.activityLogs.forEach((container) => {
     container.innerHTML = "";
-    events.forEach((event) => {
+    events
+      .filter((event) => state.logFilter === "all" || event.type === state.logFilter)
+      .forEach((event) => {
       const item = document.createElement("div");
-      item.className = `activity-item ${event.type === "chat" ? "chat" : "system"}`;
-      item.textContent = event.message;
+      item.className = `activity-item ${event.type === "chat" ? "chat" : "system"} ${getEventHighlightClass(event)}`;
+      item.innerHTML = `
+        <time>${formatEventTime(event.createdAt)}</time>
+        <span>${escapeHtml(event.message)}</span>
+      `;
       container.append(item);
     });
+  });
+  elements.logFilters.forEach((button) => {
+    button.classList.toggle("active", button.dataset.filter === state.logFilter);
+  });
+}
+
+function getEventHighlightClass(event) {
+  const message = event.message || "";
+  if (message.includes("STOP")) return "highlight-stop";
+  if (message.includes("iniciada")) return "highlight-start";
+  if (message.includes("concluida")) return "highlight-finish";
+  if (message.includes("venceu")) return "highlight-winner";
+  return "";
+}
+
+function formatEventTime(timestamp) {
+  if (!timestamp) {
+    return "--:--";
+  }
+  return new Date(timestamp * 1000).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -499,14 +633,16 @@ function renderVotes(room) {
     const currentVote = Object.prototype.hasOwnProperty.call(votes, state.playerId)
       ? votes[state.playerId]
       : votes.system;
+    const scoring = getAnswerScorePreview(room, playerId, category);
     const row = document.createElement("button");
     row.type = "button";
-    row.className = `vote-row ${currentVote ? "valid" : "invalid"}`;
+    row.className = `vote-row ${currentVote ? "valid" : "invalid"} score-${scoring.points}`;
     row.disabled = !answer;
     row.innerHTML = `
       <span>
         <strong>${escapeHtml(playerName)}</strong>
         <em>${escapeHtml(answer || "Sem resposta")}</em>
+        <small>${scoring.points} pts · ${escapeHtml(scoring.reason)}</small>
       </span>
       <b>${currentVote ? "✓" : "×"}</b>
     `;
@@ -524,6 +660,42 @@ function renderVotes(room) {
   }
 }
 
+function getAnswerScorePreview(room, playerId, category) {
+  const answer = (room.answers[playerId]?.[category] || "").trim();
+  const valid = isAnswerValidByVotes(room, playerId, category, answer);
+  if (!answer) {
+    return { points: 0, reason: "sem resposta" };
+  }
+  if (!valid) {
+    return { points: 0, reason: "inválida pela votação" };
+  }
+
+  const repeated = Object.entries(room.answers)
+    .some(([otherPlayerId, answers]) =>
+      otherPlayerId !== playerId &&
+      (answers[category] || "").trim().toLocaleLowerCase() === answer.toLocaleLowerCase() &&
+      isAnswerValidByVotes(room, otherPlayerId, category, answers[category] || ""),
+    );
+
+  if (repeated) {
+    return { points: 5, reason: "válida, mas repetida" };
+  }
+  return { points: 10, reason: "válida e única" };
+}
+
+function isAnswerValidByVotes(room, playerId, category, answer) {
+  if (!String(answer || "").trim()) {
+    return false;
+  }
+  const votes = room.votes[`${playerId}:${category}`] || {};
+  const playerVotes = Object.entries(votes).filter(([voter]) => voter !== "system");
+  if (playerVotes.length === 0) {
+    return votes.system !== false;
+  }
+  const positiveVotes = playerVotes.filter(([, valid]) => valid).length;
+  return positiveVotes >= playerVotes.length / 2;
+}
+
 function renderPodium(room) {
   const podium = Object.entries(room.players)
     .map(([playerId, name]) => ({
@@ -536,10 +708,15 @@ function renderPodium(room) {
 
   const winnerName = room.winner_id ? room.players[room.winner_id] : null;
   const isGameOver = Boolean(room.winner_id);
-  elements.podiumTitle.textContent = winnerName ? `${winnerName} venceu a sala!` : "Podium da rodada";
+  elements.podiumTitle.textContent = winnerName ? `${winnerName} venceu a sala!` : "Pódio da rodada";
   elements.podiumSubtitle.textContent = isGameOver
-    ? "A partida terminou. Comece uma nova sala ou volte ao inicio para entrar em outra."
-    : "Rodada concluida. O dono da sala pode iniciar a proxima rodada.";
+    ? "A partida terminou. Comece uma nova sala ou volte ao início para entrar em outra."
+    : "Rodada concluída. O dono da sala pode iniciar a próxima rodada.";
+  elements.podiumSummary.innerHTML = `
+    <div><small>Campeão</small><strong>${escapeHtml(winnerName || podium[0]?.name || "-")}</strong></div>
+    <div><small>Rodadas jogadas</small><strong>${room.round_number || 0}/${room.max_rounds || state.maxRounds}</strong></div>
+    <div><small>Jogadores</small><strong>${podium.length}</strong></div>
+  `;
   elements.podiumList.innerHTML = "";
 
   podium.forEach((player, index) => {
@@ -547,18 +724,42 @@ function renderPodium(room) {
     item.className = `podium-item position-${index + 1}`;
     item.innerHTML = `
       <span>${index + 1}º</span>
-      <strong>${escapeHtml(player.name)}</strong>
-      <small>+${player.round} na rodada / ${player.total} pontos</small>
+      <div>
+        <strong>${escapeHtml(player.name)}</strong>
+        <small>+${player.round} na rodada / ${player.total} pontos</small>
+      </div>
+      <b>${player.playerId === room.winner_id ? "Campeão" : `${player.total} pts`}</b>
     `;
     elements.podiumList.append(item);
   });
 }
 
-async function playAgain() {
-  if (state.socket) {
-    state.socket.close();
-    state.socket = null;
+async function shareResult() {
+  if (!state.room) return;
+  const text = buildResultText(state.room);
+  if (navigator.share) {
+    await navigator.share({ title: "Resultado Stop Online", text });
+    return;
   }
+  await copyText(text);
+  elements.shareResultBtn.textContent = "Resultado copiado";
+  setTimeout(() => {
+    elements.shareResultBtn.textContent = "Compartilhar resultado";
+  }, 1600);
+}
+
+function buildResultText(room) {
+  const ranking = Object.entries(room.players)
+    .map(([playerId, name]) => ({ name, total: room.scores[playerId] || 0 }))
+    .sort((first, second) => second.total - first.total)
+    .map((player, index) => `${index + 1}. ${player.name}: ${player.total} pts`)
+    .join("\n");
+  const winner = room.winner_id ? room.players[room.winner_id] : "sem campeão definido";
+  return `Stop Online - sala ${room.id}\nCampeão: ${winner}\nRodadas: ${room.round_number}/${room.max_rounds}\n\n${ranking}`;
+}
+
+async function playAgain() {
+  closeSocketIntentionally();
   clearSavedSession();
   const playerName = elements.playerName.value.trim() || state.room?.players?.[state.playerId] || "";
   if (playerName) {
@@ -568,10 +769,7 @@ async function playAgain() {
 }
 
 function goBackToStart() {
-  if (state.socket) {
-    state.socket.close();
-    state.socket = null;
-  }
+  closeSocketIntentionally();
   clearSavedSession();
   render();
 }
@@ -603,7 +801,7 @@ async function copyRoomCode() {
   elements.copyRoomCodeBtn.title = "Copiado!";
   setTimeout(() => {
     elements.copyRoomCodeBtn.classList.remove("copied");
-    elements.copyRoomCodeBtn.title = "Copiar codigo";
+    elements.copyRoomCodeBtn.title = "Copiar código";
   }, 1400);
 }
 
@@ -634,10 +832,7 @@ async function leaveRoom() {
 
   await request(`/api/v1/rooms/${state.room.id}/players/${state.playerId}/leave`, "POST");
   hideLeaveRoomModal();
-  if (state.socket) {
-    state.socket.close();
-    state.socket = null;
-  }
+  closeSocketIntentionally();
   clearSavedSession();
   render();
 }
@@ -652,8 +847,9 @@ function updateButtons(room) {
   elements.newRoundBtn.disabled = !isHost || Boolean(room.winner_id);
   elements.newRoundBtn.hidden = Boolean(room.winner_id);
   elements.newRoundBtn.title = isHost ? "" : "Apenas o dono da sala pode começar rodadas.";
+  elements.shareResultBtn.hidden = room.status !== "finished" && !room.winner_id;
   elements.playAgainBtn.hidden = !room.winner_id;
-  elements.backToStartBtn.hidden = !room.winner_id;
+  elements.backToStartBtn.hidden = room.status !== "finished" && !room.winner_id;
 }
 
 function collectAnswers() {
@@ -675,6 +871,7 @@ function showView(viewName) {
     round: elements.roundView,
     review: elements.reviewView,
     podium: elements.podiumView,
+    demo: elements.demoView,
   };
   Object.values(views).forEach((view) => view.classList.remove("active"));
   views[viewName].classList.add("active");
@@ -1103,6 +1300,7 @@ function getDebugPanelPreference() {
 }
 
 function renderDevOpsPanel(data) {
+  state.lastDevOpsData = data;
   const lastOperation = data.operations?.[0];
   elements.devDsmStatus.textContent = formatDsmStatus(data.dsm.status);
   elements.devRedisStatus.textContent = formatDsmStatus(data.redis.status);
@@ -1111,14 +1309,59 @@ function renderDevOpsPanel(data) {
   elements.devOpsCount.textContent = String(data.operations?.length || 0);
 
   elements.devDiagnostics.innerHTML = `
-    <small>Diagnostico</small>
+    <small>Diagnóstico</small>
     <div>TTL: ${data.cache.ttl}s | Prefixo: ${escapeHtml(data.cache.prefix)}</div>
     <div>Hit/Miss/Erro: ${data.stats.hits}/${data.stats.misses}/${data.stats.errors}</div>
     <div>Fallbacks: ${data.stats.fallbacks} | Salas na origem local: ${data.cache.originRooms}</div>
-    <div>Ultima operacao: ${lastOperation ? escapeHtml(lastOperation.action) : "-"} (${lastOperation ? escapeHtml(lastOperation.result) : "-"})</div>
+    <div>Última operação: ${lastOperation ? escapeHtml(lastOperation.action) : "-"} (${lastOperation ? escapeHtml(lastOperation.result) : "-"})</div>
     <div>Cache ms: ${lastOperation?.cacheMs ?? "-"} | Origem ms: ${lastOperation?.originMs ?? "-"}</div>
     <div>Atualizado em: ${data.dsm.lastUpdatedAt ? new Date(data.dsm.lastUpdatedAt * 1000).toLocaleTimeString("pt-BR") : "-"}</div>
   `;
+  renderDevOpsEvents(data);
+}
+
+function renderDevOpsEvents(data) {
+  const redisEvents = (data.operations || []).slice(0, 6).map((operation) => ({
+    source: "Redis",
+    type: operation.action,
+    status: operation.cacheStatus || operation.result,
+    roomId: operation.roomId,
+    createdAt: operation.finishedAt,
+  }));
+  const rabbitEvents = (data.rabbitmq?.events || []).slice(0, 6).map((event) => ({
+    source: "RabbitMQ",
+    type: event.type,
+    status: event.status,
+    roomId: event.roomId,
+    createdAt: event.createdAt,
+  }));
+  const events = [...redisEvents, ...rabbitEvents]
+    .sort((first, second) => (second.createdAt || 0) - (first.createdAt || 0))
+    .slice(0, 10);
+
+  elements.devEvents.innerHTML = `
+    <small>Últimos eventos Redis/RabbitMQ</small>
+    <div class="devops-events-list">
+      ${events.length ? events.map((event) => `
+        <div>
+          <b>${escapeHtml(event.source)}</b>
+          <span>${escapeHtml(event.type)} · ${escapeHtml(event.status)} · ${escapeHtml(event.roomId || "-")}</span>
+          <time>${formatEventTime(event.createdAt)}</time>
+        </div>
+      `).join("") : "<span>Nenhum evento registrado.</span>"}
+    </div>
+  `;
+}
+
+async function copyDiagnostics() {
+  if (!state.lastDevOpsData) {
+    await refreshDevOpsPanel();
+  }
+  await copyText(JSON.stringify(state.lastDevOpsData || {}, null, 2));
+  elements.devCopyDiagnosticsBtn.textContent = "Copiado";
+  setTimeout(() => {
+    elements.devCopyDiagnosticsBtn.textContent = "Copiar diagnóstico";
+  }, 1400);
 }
 
 async function clearRoomCache() {
@@ -1129,7 +1372,7 @@ async function clearRoomCache() {
 
 async function forceCacheMiss() {
   if (!state.room?.id) {
-    alert("Entre em uma sala para forcar miss.");
+    alert("Entre em uma sala para forçar miss.");
     return;
   }
   await request(`/api/v1/dev/cache/force-miss/${state.room.id}`, "POST");

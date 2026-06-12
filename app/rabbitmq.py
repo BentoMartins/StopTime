@@ -1,5 +1,7 @@
 import json
 import logging
+import time
+from collections import deque
 from typing import Any
 
 import aio_pika
@@ -16,6 +18,7 @@ class RabbitPublisher:
         self.channel: AbstractChannel | None = None
         self.exchange: AbstractExchange | None = None
         self.audit_queue: AbstractQueue | None = None
+        self._events: deque[dict[str, Any]] = deque(maxlen=40)
 
     async def connect(self) -> None:
         try:
@@ -34,6 +37,7 @@ class RabbitPublisher:
             logger.exception("RabbitMQ indisponivel. A API continua funcionando sem publicar eventos.")
 
     async def publish(self, event_type: str, payload: dict[str, Any]) -> None:
+        self._record_event(event_type, payload, "published" if self.exchange is not None else "skipped")
         if self.exchange is None:
             return
 
@@ -47,8 +51,25 @@ class RabbitPublisher:
     async def consume_audit_event(self, message: AbstractIncomingMessage) -> None:
         async with message.process():
             payload = json.loads(message.body.decode("utf-8"))
+            self._record_event(payload.get("type", "unknown"), payload.get("payload", {}), "consumed")
             logger.info("Evento processado assincronamente: %s", payload.get("type"))
 
     async def close(self) -> None:
         if self.connection is not None:
             await self.connection.close()
+
+    def diagnostics(self) -> dict[str, Any]:
+        return {
+            "status": "online" if self.exchange is not None else "offline",
+            "events": list(reversed(self._events)),
+        }
+
+    def _record_event(self, event_type: str, payload: dict[str, Any], status: str) -> None:
+        self._events.append(
+            {
+                "type": event_type,
+                "status": status,
+                "roomId": payload.get("roomId"),
+                "createdAt": int(time.time()),
+            }
+        )
