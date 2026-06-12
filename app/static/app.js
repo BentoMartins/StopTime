@@ -30,7 +30,15 @@ const state = {
   socketStatus: "offline",
   logFilter: "all",
   lastDevOpsData: null,
+  network: {
+    baseUrl: null,
+    ipv4: null,
+    port: null,
+    pollTimer: null,
+  },
 };
+
+const NETWORK_POLL_INTERVAL_MS = 5000;
 
 const elements = {
   connectionStatus: document.querySelector("#connectionStatus"),
@@ -145,7 +153,7 @@ elements.logFilters.forEach((button) => {
 
 renderConfigChips();
 applyRoomCodeFromUrl();
-updateEntryQrCode();
+startNetworkMonitoring();
 initDevOpsPanel();
 if (window.location.pathname === "/demo") {
   showView("demo");
@@ -216,17 +224,75 @@ async function restoreSavedRoom() {
   }
 }
 
+async function refreshNetworkInfo() {
+  try {
+    const response = await request("/api/v1/network/info");
+    const next = response.data;
+    const changed =
+      next.baseUrl !== state.network.baseUrl ||
+      next.ipv4 !== state.network.ipv4 ||
+      next.port !== state.network.port;
+
+    state.network.baseUrl = next.baseUrl;
+    state.network.ipv4 = next.ipv4;
+    state.network.port = next.port;
+
+    if (changed || !elements.roomQrCode.getAttribute("src")) {
+      updateEntryQrCode();
+    }
+  } catch {
+    if (!state.network.baseUrl) {
+      state.network.baseUrl = window.location.origin;
+      updateEntryQrCode();
+    }
+  }
+}
+
+function startNetworkMonitoring() {
+  void refreshNetworkInfo();
+  state.network.pollTimer = window.setInterval(() => {
+    void refreshNetworkInfo();
+  }, NETWORK_POLL_INTERVAL_MS);
+  window.addEventListener("pagehide", stopNetworkMonitoring, { once: true });
+}
+
+function stopNetworkMonitoring() {
+  if (state.network.pollTimer !== null) {
+    clearInterval(state.network.pollTimer);
+    state.network.pollTimer = null;
+  }
+}
+
 function updateEntryQrCode() {
   const roomId = elements.roomCodeInput.value.trim().toUpperCase();
-  const url = new URL(window.location.href);
+  const params = new URLSearchParams();
+
   if (roomId) {
-    url.searchParams.set("room", roomId);
-    elements.roomQrHint.textContent = `Escaneie para abrir a sala ${roomId} no celular.`;
-  } else {
-    url.searchParams.delete("room");
-    elements.roomQrHint.textContent = "Digite um código de sala para gerar o QR Code.";
+    params.set("room", roomId);
   }
-  elements.roomQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=FFFFFF&bgcolor=052268&margin=12&data=${encodeURIComponent(url.toString())}`;
+
+  if (state.network.ipv4 && state.network.port) {
+    params.set("v", `${state.network.ipv4}:${state.network.port}`);
+  } else {
+    params.set("v", Date.now().toString());
+  }
+
+  elements.roomQrCode.src = `/api/v1/network/qr-code?${params.toString()}`;
+
+  if (roomId) {
+    const target = state.network.ipv4
+      ? `${state.network.ipv4}:${state.network.port}`
+      : "rede local";
+    elements.roomQrHint.textContent = `Escaneie para abrir a sala ${roomId} no celular (${target}).`;
+    return;
+  }
+
+  if (state.network.baseUrl) {
+    elements.roomQrHint.textContent = `Escaneie para abrir o jogo no celular (${state.network.baseUrl}).`;
+    return;
+  }
+
+  elements.roomQrHint.textContent = "Detectando IP da rede local...";
 }
 
 async function saveConfig() {

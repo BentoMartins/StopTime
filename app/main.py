@@ -2,9 +2,9 @@ import logging
 from collections import defaultdict
 from typing import Any
 
-from fastapi import Header, HTTPException, FastAPI, WebSocket, WebSocketDisconnect, status
+from fastapi import Header, HTTPException, FastAPI, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.game import GameService
@@ -22,6 +22,7 @@ from app.models import (
 from app.rabbitmq import RabbitPublisher
 from app.redis_store import RedisStore
 from app.config import settings
+from app.network import build_join_url, build_network_info, generate_qr_code_png
 
 logging.basicConfig(level=logging.INFO)
 
@@ -87,6 +88,30 @@ async def startup() -> None:
 async def shutdown() -> None:
     await rabbit.close()
     await store.close()
+
+
+@app.get("/api/v1/network/info")
+async def network_info(request: Request) -> dict[str, Any]:
+    info = build_network_info(request)
+    return {
+        "data": {
+            "ipv4": info.ipv4,
+            "port": info.port,
+            "baseUrl": info.base_url,
+        }
+    }
+
+
+@app.get("/api/v1/network/qr-code")
+async def network_qr_code(request: Request, room: str | None = None) -> Response:
+    info = build_network_info(request)
+    join_url = build_join_url(info, room)
+    png = generate_qr_code_png(join_url)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 @app.get("/")
