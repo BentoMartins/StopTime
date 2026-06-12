@@ -21,6 +21,7 @@ const state = {
   lastStatus: null,
   stopModalRound: null,
   saveTimeout: null,
+  loadingCount: 0,
   debugPanel: getDebugPanelPreference(),
   devOpsPanelOpen: localStorage.getItem("stop.debugPanelOpen") === "true",
 };
@@ -66,6 +67,8 @@ const elements = {
   stopModal: document.querySelector("#stopModal"),
   stopMessage: document.querySelector("#stopMessage"),
   leaveRoomModal: document.querySelector("#leaveRoomModal"),
+  loadingOverlay: document.querySelector("#loadingOverlay"),
+  loadingMessage: document.querySelector("#loadingMessage"),
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
   leaveRoomBtn: document.querySelector("#leaveRoomBtn"),
@@ -92,23 +95,23 @@ const elements = {
   devDiagnostics: document.querySelector("#devDiagnostics"),
 };
 
-elements.createRoomBtn.addEventListener("click", () => runAction(createRoom));
-elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom));
-elements.startRoundBtn.addEventListener("click", () => runAction(startRound));
-elements.stopBtn.addEventListener("click", () => runAction(stopRound));
-elements.newRoundBtn.addEventListener("click", () => runAction(startRound));
-elements.playAgainBtn.addEventListener("click", () => runAction(playAgain));
+elements.createRoomBtn.addEventListener("click", () => runAction(createRoom, false, "Criando sala..."));
+elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom, false, "Entrando na sala..."));
+elements.startRoundBtn.addEventListener("click", () => runAction(startRound, false, "Iniciando rodada..."));
+elements.stopBtn.addEventListener("click", () => runAction(stopRound, false, "Enviando STOP..."));
+elements.newRoundBtn.addEventListener("click", () => runAction(startRound, false, "Preparando rodada..."));
+elements.playAgainBtn.addEventListener("click", () => runAction(playAgain, false, "Criando nova sala..."));
 elements.backToStartBtn.addEventListener("click", goBackToStart);
 elements.closeStopModalBtn.addEventListener("click", hideStopModal);
 elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
-elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom));
-elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode));
+elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom, false, "Saindo da sala..."));
+elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode, false, "Copiando codigo..."));
 elements.devOpsToggle.addEventListener("click", () => setDevOpsPanelOpen(!state.devOpsPanelOpen));
 elements.devOpsCloseBtn.addEventListener("click", () => setDevOpsPanelOpen(false));
-elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel));
-elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss));
-elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache));
+elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel, false, "Atualizando diagnostico..."));
+elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss, false, "Forcando cache miss..."));
+elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache, false, "Limpando cache..."));
 elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
 elements.categoryInput.addEventListener("keydown", (event) => addChipOnEnter(event, addCategory));
@@ -167,6 +170,7 @@ async function restoreSavedRoom() {
     return;
   }
 
+  showLoading("Restaurando sala...");
   try {
     const response = await request(`/api/v1/rooms/${roomId.trim().toUpperCase()}`);
     if (!response.data.players[state.playerId]) {
@@ -180,6 +184,8 @@ async function restoreSavedRoom() {
   } catch {
     clearSavedSession(false);
     render();
+  } finally {
+    hideLoading();
   }
 }
 
@@ -505,7 +511,11 @@ function renderVotes(room) {
       <b>${currentVote ? "✓" : "×"}</b>
     `;
     row.setAttribute("aria-label", `${currentVote ? "Invalidar" : "Validar"} resposta de ${playerName}`);
-    row.addEventListener("click", () => voteAnswer(playerId, category, !currentVote));
+    row.addEventListener("click", () => runAction(
+      () => voteAnswer(playerId, category, !currentVote),
+      false,
+      "Registrando voto...",
+    ));
     elements.votesPanel.append(row);
   });
 
@@ -1008,7 +1018,10 @@ function scheduleAutoSave() {
   state.saveTimeout = setTimeout(() => runAction(() => submitAnswers(false), true), 600);
 }
 
-async function runAction(action, silent = false) {
+async function runAction(action, silent = false, loadingMessage = "Carregando...") {
+  if (!silent) {
+    showLoading(loadingMessage);
+  }
   try {
     await action();
     refreshDevOpsPanel(true);
@@ -1016,7 +1029,27 @@ async function runAction(action, silent = false) {
     if (!silent) {
       alert(error.message);
     }
+  } finally {
+    if (!silent) {
+      hideLoading();
+    }
   }
+}
+
+function showLoading(message = "Carregando...") {
+  state.loadingCount += 1;
+  elements.loadingMessage.textContent = message;
+  elements.loadingOverlay.classList.remove("hidden");
+  document.body.setAttribute("aria-busy", "true");
+}
+
+function hideLoading() {
+  state.loadingCount = Math.max(0, state.loadingCount - 1);
+  if (state.loadingCount > 0) {
+    return;
+  }
+  elements.loadingOverlay.classList.add("hidden");
+  document.body.removeAttribute("aria-busy");
 }
 
 function initDevOpsPanel() {
