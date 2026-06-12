@@ -141,7 +141,7 @@ elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
 elements.categoryInput.addEventListener("keydown", (event) => addChipOnEnter(event, addCategory));
 elements.roomCodeInput.addEventListener("input", updateEntryQrCode);
-elements.maxRoundsInput.addEventListener("input", updateMaxRounds);
+elements.maxRoundsInput.addEventListener("change", updateMaxRounds);
 elements.roundDurationInput.addEventListener("input", updateRoundDuration);
 elements.chatForms.forEach((form) => form.addEventListener("submit", sendChatMessage));
 elements.logFilters.forEach((button) => {
@@ -1076,7 +1076,7 @@ function getMaxRounds() {
   if (Number.isNaN(value)) {
     return 6;
   }
-  return Math.min(15, Math.max(6, value));
+  return Math.min(15, Math.max(1, value));
 }
 
 function getRoundDurationSeconds() {
