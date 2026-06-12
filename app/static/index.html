@@ -214,11 +214,16 @@
       </section>
 
       <section id="podiumView" class="view">
-        <article class="card">
+        <article class="card podium-card">
           <p class="step">Etapa 6</p>
           <h2 id="podiumTitle">Podium da rodada</h2>
+          <p id="podiumSubtitle" class="podium-subtitle">Confira a pontuacao e escolha o proximo passo.</p>
           <div id="podiumList" class="podium"></div>
-          <button id="newRoundBtn">Nova rodada</button>
+          <div class="podium-actions">
+            <button id="newRoundBtn">Nova rodada</button>
+            <button id="playAgainBtn" class="secondary" type="button">Jogar novamente</button>
+            <button id="backToStartBtn" class="secondary" type="button">Voltar ao inicio</button>
+          </div>
         </article>
       </section>
 
@@ -242,9 +247,21 @@
         </div>
       </div>
 
+      <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite">
+        <div class="loading-content">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <strong id="loadingMessage">Carregando...</strong>
+        </div>
+      </div>
+
+      <button id="devOpsToggle" class="devops-toggle hidden" type="button" aria-expanded="false">
+        DSM / Cache
+      </button>
+
       <aside id="devOpsPanel" class="devops-panel hidden" aria-live="polite">
         <header>
           <span>DSM / Cache</span>
+          <button id="devOpsCloseBtn" class="devops-close" type="button" aria-label="Fechar painel DSM">×</button>
           <strong id="devDsmStatus">-</strong>
         </header>
         <div class="devops-grid">

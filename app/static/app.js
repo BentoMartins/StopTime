@@ -2,10 +2,12 @@ const AVAILABLE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const MIN_CATEGORIES = 5;
 const MAX_CATEGORIES = 20;
 const MIN_LETTERS = 3;
+const queryParams = new URLSearchParams(window.location.search);
 
 const state = {
   room: null,
   playerId: localStorage.getItem("stop.playerId"),
+  roomId: localStorage.getItem("stop.roomId"),
   socket: null,
   categories: ["Nome", "CEP", "Animal", "Comida", "Cor", "Objeto"],
   letters: [...AVAILABLE_LETTERS],
@@ -19,8 +21,9 @@ const state = {
   lastStatus: null,
   stopModalRound: null,
   saveTimeout: null,
-  debugPanel: new URLSearchParams(window.location.search).get("debug") === "1"
-    || localStorage.getItem("stop.debugPanel") === "true",
+  loadingCount: 0,
+  debugPanel: getDebugPanelPreference(),
+  devOpsPanelOpen: localStorage.getItem("stop.debugPanelOpen") === "true",
 };
 
 const elements = {
@@ -59,10 +62,13 @@ const elements = {
   reviewCategoryTitle: document.querySelector("#reviewCategoryTitle"),
   reviewTimer: document.querySelector("#reviewTimer"),
   podiumTitle: document.querySelector("#podiumTitle"),
+  podiumSubtitle: document.querySelector("#podiumSubtitle"),
   podiumList: document.querySelector("#podiumList"),
   stopModal: document.querySelector("#stopModal"),
   stopMessage: document.querySelector("#stopMessage"),
   leaveRoomModal: document.querySelector("#leaveRoomModal"),
+  loadingOverlay: document.querySelector("#loadingOverlay"),
+  loadingMessage: document.querySelector("#loadingMessage"),
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
   leaveRoomBtn: document.querySelector("#leaveRoomBtn"),
@@ -70,10 +76,14 @@ const elements = {
   startRoundBtn: document.querySelector("#startRoundBtn"),
   stopBtn: document.querySelector("#stopBtn"),
   newRoundBtn: document.querySelector("#newRoundBtn"),
+  playAgainBtn: document.querySelector("#playAgainBtn"),
+  backToStartBtn: document.querySelector("#backToStartBtn"),
   closeStopModalBtn: document.querySelector("#closeStopModalBtn"),
   cancelLeaveRoomBtn: document.querySelector("#cancelLeaveRoomBtn"),
   confirmLeaveRoomBtn: document.querySelector("#confirmLeaveRoomBtn"),
+  devOpsToggle: document.querySelector("#devOpsToggle"),
   devOpsPanel: document.querySelector("#devOpsPanel"),
+  devOpsCloseBtn: document.querySelector("#devOpsCloseBtn"),
   devDsmStatus: document.querySelector("#devDsmStatus"),
   devRedisStatus: document.querySelector("#devRedisStatus"),
   devRedisLatency: document.querySelector("#devRedisLatency"),
@@ -85,19 +95,23 @@ const elements = {
   devDiagnostics: document.querySelector("#devDiagnostics"),
 };
 
-elements.createRoomBtn.addEventListener("click", () => runAction(createRoom));
-elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom));
-elements.startRoundBtn.addEventListener("click", () => runAction(startRound));
-elements.stopBtn.addEventListener("click", () => runAction(stopRound));
-elements.newRoundBtn.addEventListener("click", () => runAction(startRound));
+elements.createRoomBtn.addEventListener("click", () => runAction(createRoom, false, "Criando sala..."));
+elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom, false, "Entrando na sala..."));
+elements.startRoundBtn.addEventListener("click", () => runAction(startRound, false, "Iniciando rodada..."));
+elements.stopBtn.addEventListener("click", () => runAction(stopRound, false, "Enviando STOP..."));
+elements.newRoundBtn.addEventListener("click", () => runAction(startRound, false, "Preparando rodada..."));
+elements.playAgainBtn.addEventListener("click", () => runAction(playAgain, false, "Criando nova sala..."));
+elements.backToStartBtn.addEventListener("click", goBackToStart);
 elements.closeStopModalBtn.addEventListener("click", hideStopModal);
 elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
-elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom));
-elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode));
-elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel));
-elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss));
-elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache));
+elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom, false, "Saindo da sala..."));
+elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode, false, "Copiando codigo..."));
+elements.devOpsToggle.addEventListener("click", () => setDevOpsPanelOpen(!state.devOpsPanelOpen));
+elements.devOpsCloseBtn.addEventListener("click", () => setDevOpsPanelOpen(false));
+elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel, false, "Atualizando diagnostico..."));
+elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss, false, "Forcando cache miss..."));
+elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache, false, "Limpando cache..."));
 elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
 elements.categoryInput.addEventListener("keydown", (event) => addChipOnEnter(event, addCategory));
@@ -105,12 +119,12 @@ elements.roomCodeInput.addEventListener("input", updateEntryQrCode);
 elements.maxRoundsInput.addEventListener("input", updateMaxRounds);
 elements.roundDurationInput.addEventListener("input", updateRoundDuration);
 elements.chatForms.forEach((form) => form.addEventListener("submit", sendChatMessage));
-window.addEventListener("beforeunload", notifyPlayerLeft);
 
 renderConfigChips();
 applyRoomCodeFromUrl();
 updateEntryQrCode();
 initDevOpsPanel();
+restoreSavedRoom();
 
 async function createRoom() {
   const hostName = requirePlayerName();
@@ -143,11 +157,36 @@ async function joinRoom() {
 }
 
 function applyRoomCodeFromUrl() {
-  const roomId = new URLSearchParams(window.location.search).get("room");
+  const roomId = queryParams.get("room");
   if (!roomId) {
     return;
   }
   elements.roomCodeInput.value = roomId.trim().toUpperCase().slice(0, 6);
+}
+
+async function restoreSavedRoom() {
+  const roomId = queryParams.get("room") || state.roomId;
+  if (!roomId || !state.playerId) {
+    return;
+  }
+
+  showLoading("Restaurando sala...");
+  try {
+    const response = await request(`/api/v1/rooms/${roomId.trim().toUpperCase()}`);
+    if (!response.data.players[state.playerId]) {
+      clearSavedSession(false);
+      elements.roomCodeInput.value = response.data.id;
+      updateEntryQrCode();
+      return;
+    }
+    setRoom(response.data);
+    connectSocket(response.data.id);
+  } catch {
+    clearSavedSession(false);
+    render();
+  } finally {
+    hideLoading();
+  }
 }
 
 function updateEntryQrCode() {
@@ -277,6 +316,8 @@ function setPlayer(playerId) {
 function setRoom(room) {
   const previousStatus = state.room?.status || state.lastStatus;
   state.room = room;
+  state.roomId = room.id;
+  localStorage.setItem("stop.roomId", room.id);
   if (previousStatus === "playing" && room.status === "voting") {
     state.reviewCategoryIndex = 0;
   }
@@ -470,7 +511,11 @@ function renderVotes(room) {
       <b>${currentVote ? "✓" : "×"}</b>
     `;
     row.setAttribute("aria-label", `${currentVote ? "Invalidar" : "Validar"} resposta de ${playerName}`);
-    row.addEventListener("click", () => voteAnswer(playerId, category, !currentVote));
+    row.addEventListener("click", () => runAction(
+      () => voteAnswer(playerId, category, !currentVote),
+      false,
+      "Registrando voto...",
+    ));
     elements.votesPanel.append(row);
   });
 
@@ -490,7 +535,11 @@ function renderPodium(room) {
     .sort((first, second) => second.total - first.total);
 
   const winnerName = room.winner_id ? room.players[room.winner_id] : null;
+  const isGameOver = Boolean(room.winner_id);
   elements.podiumTitle.textContent = winnerName ? `${winnerName} venceu a sala!` : "Podium da rodada";
+  elements.podiumSubtitle.textContent = isGameOver
+    ? "A partida terminou. Comece uma nova sala ou volte ao inicio para entrar em outra."
+    : "Rodada concluida. O dono da sala pode iniciar a proxima rodada.";
   elements.podiumList.innerHTML = "";
 
   podium.forEach((player, index) => {
@@ -503,6 +552,28 @@ function renderPodium(room) {
     `;
     elements.podiumList.append(item);
   });
+}
+
+async function playAgain() {
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  clearSavedSession();
+  const playerName = elements.playerName.value.trim() || state.room?.players?.[state.playerId] || "";
+  if (playerName) {
+    elements.playerName.value = playerName;
+  }
+  await createRoom();
+}
+
+function goBackToStart() {
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  clearSavedSession();
+  render();
 }
 
 async function sendChatMessage(event) {
@@ -567,24 +638,8 @@ async function leaveRoom() {
     state.socket.close();
     state.socket = null;
   }
-  state.room = null;
-  state.lastStatus = null;
-  state.stopModalRound = null;
-  state.reviewCategoryIndex = 0;
-  state.playerId = null;
-  localStorage.removeItem("stop.playerId");
+  clearSavedSession();
   render();
-}
-
-function notifyPlayerLeft() {
-  if (!state.room || !state.playerId) {
-    return;
-  }
-
-  fetch(`/api/v1/rooms/${state.room.id}/players/${state.playerId}/leave`, {
-    method: "POST",
-    keepalive: true,
-  });
 }
 
 function updateButtons(room) {
@@ -595,7 +650,10 @@ function updateButtons(room) {
   elements.stopBtn.disabled = !canStop;
   elements.stopBtn.title = canStop ? "" : "Preencha todos os campos antes de pedir STOP.";
   elements.newRoundBtn.disabled = !isHost || Boolean(room.winner_id);
+  elements.newRoundBtn.hidden = Boolean(room.winner_id);
   elements.newRoundBtn.title = isHost ? "" : "Apenas o dono da sala pode começar rodadas.";
+  elements.playAgainBtn.hidden = !room.winner_id;
+  elements.backToStartBtn.hidden = !room.winner_id;
 }
 
 function collectAnswers() {
@@ -620,6 +678,21 @@ function showView(viewName) {
   };
   Object.values(views).forEach((view) => view.classList.remove("active"));
   views[viewName].classList.add("active");
+}
+
+function clearSavedSession(clearRoomInput = true) {
+  state.room = null;
+  state.roomId = null;
+  state.lastStatus = null;
+  state.stopModalRound = null;
+  state.reviewCategoryIndex = 0;
+  state.playerId = null;
+  localStorage.removeItem("stop.playerId");
+  localStorage.removeItem("stop.roomId");
+  if (clearRoomInput) {
+    elements.roomCodeInput.value = "";
+    updateEntryQrCode();
+  }
 }
 
 function renderConfigChips() {
@@ -945,7 +1018,10 @@ function scheduleAutoSave() {
   state.saveTimeout = setTimeout(() => runAction(() => submitAnswers(false), true), 600);
 }
 
-async function runAction(action, silent = false) {
+async function runAction(action, silent = false, loadingMessage = "Carregando...") {
+  if (!silent) {
+    showLoading(loadingMessage);
+  }
   try {
     await action();
     refreshDevOpsPanel(true);
@@ -953,20 +1029,42 @@ async function runAction(action, silent = false) {
     if (!silent) {
       alert(error.message);
     }
+  } finally {
+    if (!silent) {
+      hideLoading();
+    }
   }
+}
+
+function showLoading(message = "Carregando...") {
+  state.loadingCount += 1;
+  elements.loadingMessage.textContent = message;
+  elements.loadingOverlay.classList.remove("hidden");
+  document.body.setAttribute("aria-busy", "true");
+}
+
+function hideLoading() {
+  state.loadingCount = Math.max(0, state.loadingCount - 1);
+  if (state.loadingCount > 0) {
+    return;
+  }
+  elements.loadingOverlay.classList.add("hidden");
+  document.body.removeAttribute("aria-busy");
 }
 
 function initDevOpsPanel() {
   if (!state.debugPanel) {
+    elements.devOpsToggle.classList.add("hidden");
+    elements.devOpsPanel.classList.add("hidden");
     return;
   }
   localStorage.setItem("stop.debugPanel", "true");
-  elements.devOpsPanel.classList.remove("hidden");
-  refreshDevOpsPanel(true);
+  elements.devOpsToggle.classList.remove("hidden");
+  setDevOpsPanelOpen(state.devOpsPanelOpen);
 }
 
 async function refreshDevOpsPanel(silent = false) {
-  if (!state.debugPanel) {
+  if (!state.debugPanel || !state.devOpsPanelOpen) {
     return;
   }
   try {
@@ -977,6 +1075,31 @@ async function refreshDevOpsPanel(silent = false) {
       throw error;
     }
   }
+}
+
+function setDevOpsPanelOpen(open) {
+  state.devOpsPanelOpen = open;
+  localStorage.setItem("stop.debugPanelOpen", String(open));
+  elements.devOpsPanel.classList.toggle("hidden", !open);
+  elements.devOpsToggle.setAttribute("aria-expanded", String(open));
+  elements.devOpsToggle.textContent = open ? "Fechar DSM" : "DSM / Cache";
+  if (open) {
+    refreshDevOpsPanel(true);
+  }
+}
+
+function getDebugPanelPreference() {
+  const debugParam = queryParams.get("debug");
+  if (debugParam === "1") {
+    localStorage.setItem("stop.debugPanel", "true");
+    return true;
+  }
+  if (debugParam === "0") {
+    localStorage.removeItem("stop.debugPanel");
+    localStorage.removeItem("stop.debugPanelOpen");
+    return false;
+  }
+  return localStorage.getItem("stop.debugPanel") === "true";
 }
 
 function renderDevOpsPanel(data) {
