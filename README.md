@@ -156,3 +156,41 @@ Depois da pontuação, o sistema mostra o pódio da rodada. O botão **Nova roda
 6. Finalizar rodada e mostrar a pontuação.
 7. Abrir RabbitMQ Management e mostrar a fila `stop.events.audit`.
 8. Explicar concorrência simples: o servidor centraliza o estado no Redis e propaga alterações via WebSocket.
+## 8. Checklist de validacao da demo
+
+Antes da apresentacao, rode este fluxo completo:
+
+1. Inicie Redis e RabbitMQ:
+
+```bash
+docker compose up -d
+```
+
+2. Inicie a API:
+
+```bash
+python -m uvicorn app.main:app --reload --port 8001
+```
+
+3. Abra o jogo em duas janelas ou navegadores:
+
+- [http://127.0.0.1:8001](http://127.0.0.1:8001)
+- [http://127.0.0.1:8001/?debug=1](http://127.0.0.1:8001/?debug=1)
+
+4. Crie uma sala no primeiro navegador.
+5. Entre na mesma sala pelo segundo navegador.
+6. Inicie a rodada e teste dois cenarios:
+   - clicar em **STOP!** com todos os campos preenchidos;
+   - deixar o tempo acabar com campos incompletos para validar o encerramento automatico.
+7. Vote nas respostas e finalize a rodada.
+8. No painel DSM, teste:
+   - **Atualizar**;
+   - **Forcar miss**;
+   - **Limpar cache**.
+9. Abra o RabbitMQ Management:
+
+- [http://localhost:15672](http://localhost:15672)
+- usuario: `guest`
+- senha: `guest`
+
+10. Verifique a fila `stop.events.audit` e observe no terminal da API os logs `Evento processado assincronamente`.
