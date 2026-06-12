@@ -52,7 +52,7 @@ Variaveis suportadas:
 
 Painel dev/ops:
 
-- Acesse `http://localhost:8000/?debug=1`.
+- Acesse `http://127.0.0.1:8001/?debug=1`.
 - O painel mostra status DSM, status Redis, latencia, hit/miss/erro, ultimas operacoes e horario da ultima atualizacao.
 - `Atualizar` recarrega o diagnostico.
 - `Forcar miss` faz a proxima leitura da sala ignorar o Redis e buscar a origem.
@@ -79,36 +79,74 @@ flowchart LR
 
 ## 4. Como executar
 
-1. Suba Redis e RabbitMQ:
+Use este fluxo no Windows/PowerShell para evitar os problemas mais comuns: Docker Desktop parado, porta `8000` ocupada e comando `uvicorn` fora do PATH.
 
-```bash
+1. Abra o **Docker Desktop** e espere o engine iniciar.
+
+Valide no terminal:
+
+```powershell
+docker ps
+```
+
+Se aparecer erro com `dockerDesktopLinuxEngine`, o Docker Desktop ainda não iniciou corretamente.
+
+2. Entre na pasta do projeto:
+
+```powershell
+cd C:\Users\User\Downloads\github\StopTime
+```
+
+3. Suba Redis e RabbitMQ:
+
+```powershell
 docker compose up -d
 ```
 
-2. Crie e ative o ambiente virtual:
+4. Confirme se os containers estão rodando:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+```powershell
+docker compose ps
 ```
 
-3. Instale as dependências:
+O esperado é ver `stop-redis` e `stop-rabbitmq` com status `Up`.
 
-```bash
-pip install -r requirements.txt
+5. Instale as dependências:
+
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-4. Execute a aplicação:
+6. Execute a aplicação na porta recomendada:
 
-```bash
-uvicorn app.main:app --reload
+```powershell
+python -m uvicorn app.main:app --reload --port 8001
 ```
 
-5. Acesse:
+7. Acesse:
 
-- Aplicação: [http://localhost:8000](http://localhost:8000)
-- Swagger da API: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Aplicação: [http://127.0.0.1:8001](http://127.0.0.1:8001)
+- Aplicação com painel DSM/cache: [http://127.0.0.1:8001/?debug=1](http://127.0.0.1:8001/?debug=1)
+- Swagger da API: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
 - RabbitMQ Management: [http://localhost:15672](http://localhost:15672), usuário `guest`, senha `guest`
+
+Se a porta `8001` estiver ocupada, use outra:
+
+```powershell
+python -m uvicorn app.main:app --reload --port 8002
+```
+
+Para descobrir quem está usando uma porta:
+
+```powershell
+netstat -ano | findstr :8001
+```
+
+Se for um processo Python antigo da própria API, encerre pelo PID:
+
+```powershell
+Stop-Process -Id NUMERO_DO_PID
+```
 
 ## 5. Como jogar
 
