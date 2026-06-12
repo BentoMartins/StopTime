@@ -1,0 +1,1 @@
+Applying patches: move buttons in index.html, update CSS selectors in game.css and responsive.css

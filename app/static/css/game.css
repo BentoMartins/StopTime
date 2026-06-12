@@ -97,13 +97,21 @@
   background: rgb(3 27 83 / 68%);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8rem;
   margin-bottom: 1rem;
   padding: 0.8rem 1rem;
 }
 
+.game-topbar .lobby-exit-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
 .game-topbar > span {
+  justify-self: center;
   color: var(--muted);
   font-weight: 850;
   text-transform: uppercase;

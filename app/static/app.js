@@ -89,6 +89,8 @@ const elements = {
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
   leaveRoomBtn: document.querySelector("#leaveRoomBtn"),
+  leaveRoomBtnRound: document.querySelector("#leaveRoomBtnRound"),
+  leaveRoomBtnReview: document.querySelector("#leaveRoomBtnReview"),
   addCategoryBtn: document.querySelector("#addCategoryBtn"),
   startRoundBtn: document.querySelector("#startRoundBtn"),
   stopBtn: document.querySelector("#stopBtn"),
@@ -117,33 +119,75 @@ const elements = {
   logFilters: document.querySelectorAll(".logFilter"),
 };
 
-elements.createRoomBtn.addEventListener("click", () => runAction(createRoom, false, "Criando sala..."));
-elements.joinRoomBtn.addEventListener("click", () => runAction(joinRoom, false, "Entrando na sala..."));
-elements.startRoundBtn.addEventListener("click", () => runAction(startRound, false, "Iniciando rodada..."));
-elements.stopBtn.addEventListener("click", () => runAction(stopRound, false, "Enviando STOP..."));
-elements.newRoundBtn.addEventListener("click", () => runAction(startRound, false, "Preparando rodada..."));
-elements.shareResultBtn.addEventListener("click", () => runAction(shareResult, false, "Preparando resultado..."));
-elements.playAgainBtn.addEventListener("click", () => runAction(playAgain, false, "Criando nova sala..."));
+elements.createRoomBtn.addEventListener("click", () =>
+  runAction(createRoom, false, "Criando sala..."),
+);
+elements.joinRoomBtn.addEventListener("click", () =>
+  runAction(joinRoom, false, "Entrando na sala..."),
+);
+elements.startRoundBtn.addEventListener("click", () =>
+  runAction(startRound, false, "Iniciando rodada..."),
+);
+elements.stopBtn.addEventListener("click", () =>
+  runAction(stopRound, false, "Enviando STOP..."),
+);
+elements.newRoundBtn.addEventListener("click", () =>
+  runAction(startRound, false, "Preparando rodada..."),
+);
+elements.shareResultBtn.addEventListener("click", () =>
+  runAction(shareResult, false, "Preparando resultado..."),
+);
+elements.playAgainBtn.addEventListener("click", () =>
+  runAction(playAgain, false, "Criando nova sala..."),
+);
 elements.backToStartBtn.addEventListener("click", goBackToStart);
-elements.demoBackBtn.addEventListener("click", () => window.location.assign("/"));
+elements.demoBackBtn.addEventListener("click", () =>
+  window.location.assign("/"),
+);
 elements.closeStopModalBtn.addEventListener("click", hideStopModal);
 elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
+if (elements.leaveRoomBtnRound) {
+  elements.leaveRoomBtnRound.addEventListener("click", showLeaveRoomModal);
+}
+if (elements.leaveRoomBtnReview) {
+  elements.leaveRoomBtnReview.addEventListener("click", showLeaveRoomModal);
+}
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
-elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom, false, "Saindo da sala..."));
-elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode, false, "Copiando código..."));
-elements.devOpsToggle.addEventListener("click", () => setDevOpsPanelOpen(!state.devOpsPanelOpen));
-elements.devOpsCloseBtn.addEventListener("click", () => setDevOpsPanelOpen(false));
-elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel, false, "Atualizando diagnóstico..."));
-elements.devCopyDiagnosticsBtn.addEventListener("click", () => runAction(copyDiagnostics, false, "Copiando diagnóstico..."));
-elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss, false, "Forçando cache miss..."));
-elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache, false, "Limpando cache..."));
+elements.confirmLeaveRoomBtn.addEventListener("click", () =>
+  runAction(leaveRoom, false, "Saindo da sala..."),
+);
+elements.copyRoomCodeBtn.addEventListener("click", () =>
+  runAction(copyRoomCode, false, "Copiando código..."),
+);
+elements.devOpsToggle.addEventListener("click", () =>
+  setDevOpsPanelOpen(!state.devOpsPanelOpen),
+);
+elements.devOpsCloseBtn.addEventListener("click", () =>
+  setDevOpsPanelOpen(false),
+);
+elements.devRefreshBtn.addEventListener("click", () =>
+  runAction(refreshDevOpsPanel, false, "Atualizando diagnóstico..."),
+);
+elements.devCopyDiagnosticsBtn.addEventListener("click", () =>
+  runAction(copyDiagnostics, false, "Copiando diagnóstico..."),
+);
+elements.devForceMissBtn.addEventListener("click", () =>
+  runAction(forceCacheMiss, false, "Forçando cache miss..."),
+);
+elements.devClearCacheBtn.addEventListener("click", () =>
+  runAction(clearRoomCache, false, "Limpando cache..."),
+);
 elements.answersForm.addEventListener("input", scheduleAutoSave);
 elements.addCategoryBtn.addEventListener("click", addCategory);
-elements.categoryInput.addEventListener("keydown", (event) => addChipOnEnter(event, addCategory));
+elements.categoryInput.addEventListener("keydown", (event) =>
+  addChipOnEnter(event, addCategory),
+);
 elements.roomCodeInput.addEventListener("input", updateEntryQrCode);
 elements.maxRoundsInput.addEventListener("change", updateMaxRounds);
 elements.roundDurationInput.addEventListener("input", updateRoundDuration);
-elements.chatForms.forEach((form) => form.addEventListener("submit", sendChatMessage));
+elements.chatForms.forEach((form) =>
+  form.addEventListener("submit", sendChatMessage),
+);
 elements.logFilters.forEach((button) => {
   button.addEventListener("click", () => {
     state.logFilter = button.dataset.filter || "all";
@@ -207,7 +251,9 @@ async function restoreSavedRoom() {
 
   showLoading("Restaurando sala...");
   try {
-    const response = await request(`/api/v1/rooms/${roomId.trim().toUpperCase()}`);
+    const response = await request(
+      `/api/v1/rooms/${roomId.trim().toUpperCase()}`,
+    );
     if (!response.data.players[state.playerId]) {
       clearSavedSession(false);
       elements.roomCodeInput.value = response.data.id;
@@ -317,19 +363,27 @@ async function startRound() {
   if (state.room.status === "lobby") {
     await saveConfig();
   }
-  const response = await request(`/api/v1/rooms/${state.room.id}/rounds`, "POST", {
-    player_id: state.playerId,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/rounds`,
+    "POST",
+    {
+      player_id: state.playerId,
+    },
+  );
   setRoom(response.data);
 }
 
 async function submitAnswers(updateUi = true) {
   if (!ensureRoomAndPlayer()) return;
   if (state.room.status !== "playing") return;
-  const response = await request(`/api/v1/rooms/${state.room.id}/answers`, "POST", {
-    player_id: state.playerId,
-    answers: collectAnswers(),
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/answers`,
+    "POST",
+    {
+      player_id: state.playerId,
+      answers: collectAnswers(),
+    },
+  );
   if (updateUi) {
     setRoom(response.data);
   }
@@ -341,30 +395,42 @@ async function stopRound(force = false) {
     alert("Preencha todos os campos antes de pedir STOP.");
     return;
   }
-  const response = await request(`/api/v1/rooms/${state.room.id}/stop`, "POST", {
-    player_id: state.playerId,
-    answers: collectAnswers(),
-    force,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/stop`,
+    "POST",
+    {
+      player_id: state.playerId,
+      answers: collectAnswers(),
+      force,
+    },
+  );
   setRoom(response.data);
 }
 
 async function voteAnswer(targetPlayerId, category, valid) {
   if (!ensureRoomAndPlayer()) return;
-  const response = await request(`/api/v1/rooms/${state.room.id}/votes`, "POST", {
-    voter_id: state.playerId,
-    target_player_id: targetPlayerId,
-    category,
-    valid,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/votes`,
+    "POST",
+    {
+      voter_id: state.playerId,
+      target_player_id: targetPlayerId,
+      category,
+      valid,
+    },
+  );
   setRoom(response.data);
 }
 
 async function finishRound() {
   if (!ensureRoomAndPlayer()) return;
-  const response = await request(`/api/v1/rooms/${state.room.id}/finish`, "POST", {
-    player_id: state.playerId,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/finish`,
+    "POST",
+    {
+      player_id: state.playerId,
+    },
+  );
   setRoom(response.data);
 }
 
@@ -377,8 +443,12 @@ function connectSocket(roomId) {
   }
 
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const playerQuery = state.playerId ? `?player_id=${encodeURIComponent(state.playerId)}` : "";
-  state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}${playerQuery}`);
+  const playerQuery = state.playerId
+    ? `?player_id=${encodeURIComponent(state.playerId)}`
+    : "";
+  state.socket = new WebSocket(
+    `${protocol}://${window.location.host}/ws/rooms/${roomId}${playerQuery}`,
+  );
   setSocketStatus(state.reconnectAttempts > 0 ? "reconnecting" : "connecting");
   state.socket.onopen = () => {
     state.reconnectAttempts = 0;
@@ -439,7 +509,10 @@ function setSocketStatus(status) {
 
   elements.connectionStatus.textContent = labels[status] || "";
   elements.connectionStatus.className = `connection-status ${status}`;
-  elements.connectionStatus.classList.toggle("hidden", status === "offline" || status === "online");
+  elements.connectionStatus.classList.toggle(
+    "hidden",
+    status === "offline" || status === "online",
+  );
 }
 
 async function request(url, method = "GET", body) {
@@ -470,7 +543,7 @@ function setPlayer(playerId) {
 
 function updateConfigPermissions(room) {
   const isHost = room.host_id === state.playerId;
-  
+
   elements.maxRoundsInput.disabled = !isHost;
   elements.roundDurationInput.disabled = !isHost;
   elements.categoryInput.disabled = !isHost;
@@ -499,7 +572,9 @@ function render() {
   elements.reviewLetters.forEach((letter) => {
     letter.textContent = room?.current_letter || "-";
   });
-  elements.roundCounter.textContent = room ? `${room.round_number || 1}/${room.max_rounds || 6}` : "1/6";
+  elements.roundCounter.textContent = room
+    ? `${room.round_number || 1}/${room.max_rounds || 6}`
+    : "1/6";
 
   if (!room) {
     showView("entry");
@@ -515,7 +590,7 @@ function render() {
   elements.lobbyRoomCode.textContent = room.id;
   elements.lobbyRoundNumber.textContent = `${room.round_number || 0}/${state.maxRounds}`;
   elements.lobbyPlayerCount.textContent = Object.keys(room.players).length;
-  
+
   renderConfigChips();
   updateConfigPermissions(room); // NOVO: Chama a trava visual aqui
 
@@ -636,19 +711,24 @@ function renderPlayerName(name, isHost) {
 function isPlayerReady(room, playerId) {
   if (room.status === "playing") {
     const answers = room.answers[playerId] || {};
-    return room.categories.every((category) => (answers[category] || "").trim());
+    return room.categories.every((category) =>
+      (answers[category] || "").trim(),
+    );
   }
 
   if (room.status === "voting") {
-    const category = room.categories[room.review_category_index || 0] || room.categories[0];
-    return Object.keys(room.players)
-      .every((targetPlayerId) => {
-        const answer = room.answers[targetPlayerId]?.[category] || "";
-        if (!answer) {
-          return true;
-        }
-        return Object.prototype.hasOwnProperty.call(room.votes[`${targetPlayerId}:${category}`] || {}, playerId);
-      });
+    const category =
+      room.categories[room.review_category_index || 0] || room.categories[0];
+    return Object.keys(room.players).every((targetPlayerId) => {
+      const answer = room.answers[targetPlayerId]?.[category] || "";
+      if (!answer) {
+        return true;
+      }
+      return Object.prototype.hasOwnProperty.call(
+        room.votes[`${targetPlayerId}:${category}`] || {},
+        playerId,
+      );
+    });
   }
 
   return false;
@@ -659,19 +739,24 @@ function renderActivity(room) {
   elements.activityLogs.forEach((container) => {
     container.innerHTML = "";
     events
-      .filter((event) => state.logFilter === "all" || event.type === state.logFilter)
+      .filter(
+        (event) => state.logFilter === "all" || event.type === state.logFilter,
+      )
       .forEach((event) => {
-      const item = document.createElement("div");
-      item.className = `activity-item ${event.type === "chat" ? "chat" : "system"} ${getEventHighlightClass(event)}`;
-      item.innerHTML = `
+        const item = document.createElement("div");
+        item.className = `activity-item ${event.type === "chat" ? "chat" : "system"} ${getEventHighlightClass(event)}`;
+        item.innerHTML = `
         <time>${formatEventTime(event.createdAt)}</time>
         <span>${escapeHtml(event.message)}</span>
       `;
-      container.append(item);
-    });
+        container.append(item);
+      });
   });
   elements.logFilters.forEach((button) => {
-    button.classList.toggle("active", button.dataset.filter === state.logFilter);
+    button.classList.toggle(
+      "active",
+      button.dataset.filter === state.logFilter,
+    );
   });
 }
 
@@ -701,14 +786,18 @@ function renderVotes(room) {
   }
 
   state.reviewCategoryIndex = room.review_category_index || 0;
-  const category = room.categories[state.reviewCategoryIndex] || room.categories[0];
+  const category =
+    room.categories[state.reviewCategoryIndex] || room.categories[0];
   elements.reviewCategoryTitle.textContent = `${category} (${state.reviewCategoryIndex + 1}/${room.categories.length})`;
 
   Object.entries(room.players).forEach(([playerId, playerName]) => {
     const answer = room.answers[playerId]?.[category] || "";
     const voteKey = `${playerId}:${category}`;
     const votes = room.votes[voteKey] || {};
-    const currentVote = Object.prototype.hasOwnProperty.call(votes, state.playerId)
+    const currentVote = Object.prototype.hasOwnProperty.call(
+      votes,
+      state.playerId,
+    )
       ? votes[state.playerId]
       : votes.system;
     const scoring = getAnswerScorePreview(room, playerId, category);
@@ -724,12 +813,17 @@ function renderVotes(room) {
       </span>
       <b>${currentVote ? "✓" : "×"}</b>
     `;
-    row.setAttribute("aria-label", `${currentVote ? "Invalidar" : "Validar"} resposta de ${playerName}`);
-    row.addEventListener("click", () => runAction(
-      () => voteAnswer(playerId, category, !currentVote),
-      false,
-      "Registrando voto...",
-    ));
+    row.setAttribute(
+      "aria-label",
+      `${currentVote ? "Invalidar" : "Validar"} resposta de ${playerName}`,
+    );
+    row.addEventListener("click", () =>
+      runAction(
+        () => voteAnswer(playerId, category, !currentVote),
+        false,
+        "Registrando voto...",
+      ),
+    );
     elements.votesPanel.append(row);
   });
 
@@ -748,12 +842,18 @@ function getAnswerScorePreview(room, playerId, category) {
     return { points: 0, reason: "inválida pela votação" };
   }
 
-  const repeated = Object.entries(room.answers)
-    .some(([otherPlayerId, answers]) =>
+  const repeated = Object.entries(room.answers).some(
+    ([otherPlayerId, answers]) =>
       otherPlayerId !== playerId &&
-      (answers[category] || "").trim().toLocaleLowerCase() === answer.toLocaleLowerCase() &&
-      isAnswerValidByVotes(room, otherPlayerId, category, answers[category] || ""),
-    );
+      (answers[category] || "").trim().toLocaleLowerCase() ===
+        answer.toLocaleLowerCase() &&
+      isAnswerValidByVotes(
+        room,
+        otherPlayerId,
+        category,
+        answers[category] || "",
+      ),
+  );
 
   if (repeated) {
     return { points: 5, reason: "válida, mas repetida" };
@@ -766,7 +866,9 @@ function isAnswerValidByVotes(room, playerId, category, answer) {
     return false;
   }
   const votes = room.votes[`${playerId}:${category}`] || {};
-  const playerVotes = Object.entries(votes).filter(([voter]) => voter !== "system");
+  const playerVotes = Object.entries(votes).filter(
+    ([voter]) => voter !== "system",
+  );
   if (playerVotes.length === 0) {
     return votes.system !== false;
   }
@@ -786,7 +888,9 @@ function renderPodium(room) {
 
   const winnerName = room.winner_id ? room.players[room.winner_id] : null;
   const isGameOver = Boolean(room.winner_id);
-  elements.podiumTitle.textContent = winnerName ? `${winnerName} venceu a sala!` : "Pódio da rodada";
+  elements.podiumTitle.textContent = winnerName
+    ? `${winnerName} venceu a sala!`
+    : "Pódio da rodada";
   elements.podiumSubtitle.textContent = isGameOver
     ? "A partida terminou. Comece uma nova sala ou volte ao início para entrar em outra."
     : "Rodada concluída. O dono da sala pode iniciar a próxima rodada.";
@@ -832,14 +936,19 @@ function buildResultText(room) {
     .sort((first, second) => second.total - first.total)
     .map((player, index) => `${index + 1}. ${player.name}: ${player.total} pts`)
     .join("\n");
-  const winner = room.winner_id ? room.players[room.winner_id] : "sem campeão definido";
+  const winner = room.winner_id
+    ? room.players[room.winner_id]
+    : "sem campeão definido";
   return `Stop Online - sala ${room.id}\nCampeão: ${winner}\nRodadas: ${room.round_number}/${room.max_rounds}\n\n${ranking}`;
 }
 
 async function playAgain() {
   closeSocketIntentionally();
   clearSavedSession();
-  const playerName = elements.playerName.value.trim() || state.room?.players?.[state.playerId] || "";
+  const playerName =
+    elements.playerName.value.trim() ||
+    state.room?.players?.[state.playerId] ||
+    "";
   if (playerName) {
     elements.playerName.value = playerName;
   }
@@ -862,10 +971,14 @@ async function sendChatMessage(event) {
     return;
   }
 
-  const response = await request(`/api/v1/rooms/${state.room.id}/chat`, "POST", {
-    player_id: state.playerId,
-    message,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/chat`,
+    "POST",
+    {
+      player_id: state.playerId,
+      message,
+    },
+  );
   input.value = "";
   setRoom(response.data);
 }
@@ -908,7 +1021,10 @@ function hideLeaveRoomModal() {
 async function leaveRoom() {
   if (!ensureRoomAndPlayer()) return;
 
-  await request(`/api/v1/rooms/${state.room.id}/players/${state.playerId}/leave`, "POST");
+  await request(
+    `/api/v1/rooms/${state.room.id}/players/${state.playerId}/leave`,
+    "POST",
+  );
   hideLeaveRoomModal();
   closeSocketIntentionally();
   clearSavedSession();
@@ -917,17 +1033,26 @@ async function leaveRoom() {
 
 function updateButtons(room) {
   const isHost = room.host_id === state.playerId;
-  elements.startRoundBtn.disabled = !isHost || !["lobby", "finished"].includes(room.status);
-  elements.startRoundBtn.title = isHost ? "" : "Apenas o dono da sala pode começar rodadas.";
+  elements.startRoundBtn.disabled =
+    !isHost || !["lobby", "finished"].includes(room.status);
+  elements.startRoundBtn.title = isHost
+    ? ""
+    : "Apenas o dono da sala pode começar rodadas.";
   const canStop = room.status === "playing" && hasFilledAllAnswers(room);
   elements.stopBtn.disabled = !canStop;
-  elements.stopBtn.title = canStop ? "" : "Preencha todos os campos antes de pedir STOP.";
+  elements.stopBtn.title = canStop
+    ? ""
+    : "Preencha todos os campos antes de pedir STOP.";
   elements.newRoundBtn.disabled = !isHost || Boolean(room.winner_id);
   elements.newRoundBtn.hidden = Boolean(room.winner_id);
-  elements.newRoundBtn.title = isHost ? "" : "Apenas o dono da sala pode começar rodadas.";
-  elements.shareResultBtn.hidden = room.status !== "finished" && !room.winner_id;
+  elements.newRoundBtn.title = isHost
+    ? ""
+    : "Apenas o dono da sala pode começar rodadas.";
+  elements.shareResultBtn.hidden =
+    room.status !== "finished" && !room.winner_id;
   elements.playAgainBtn.hidden = !room.winner_id;
-  elements.backToStartBtn.hidden = room.status !== "finished" && !room.winner_id;
+  elements.backToStartBtn.hidden =
+    room.status !== "finished" && !room.winner_id;
 }
 
 function collectAnswers() {
@@ -1037,7 +1162,9 @@ function addCategory() {
     elements.categoryInput.value = "";
     return;
   }
-  const categoryExists = state.categories.some((item) => item.toLocaleLowerCase() === category.toLocaleLowerCase());
+  const categoryExists = state.categories.some(
+    (item) => item.toLocaleLowerCase() === category.toLocaleLowerCase(),
+  );
   if (categoryExists) {
     showCategoryFeedback(`O tema "${category}" ja existe na sala.`);
     elements.categoryInput.value = "";
@@ -1053,7 +1180,10 @@ function addCategory() {
   renderConfigChips();
   runAction(() => saveConfig(), true); // NOVO: Salva no servidor
   if (state.categories.length === MAX_CATEGORIES) {
-    showCategoryFeedback(`Limite maximo atingido: ${MAX_CATEGORIES} temas.`, "success");
+    showCategoryFeedback(
+      `Limite maximo atingido: ${MAX_CATEGORIES} temas.`,
+      "success",
+    );
     return;
   }
   clearCategoryFeedback();
@@ -1089,7 +1219,9 @@ function getRoundDurationSeconds() {
 
 function removeCategory(category) {
   if (state.categories.length <= MIN_CATEGORIES) {
-    showCategoryFeedback(`Limite minimo atingido: a sala precisa ter pelo menos ${MIN_CATEGORIES} temas.`);
+    showCategoryFeedback(
+      `Limite minimo atingido: a sala precisa ter pelo menos ${MIN_CATEGORIES} temas.`,
+    );
     return;
   }
   state.categories = state.categories.filter((item) => item !== category);
@@ -1110,7 +1242,10 @@ function renderLetterOptions() {
     button.textContent = letter;
     button.disabled = !isHost; // NOVO: Desativa clique se não for líder
     button.setAttribute("aria-pressed", String(isActive));
-    button.setAttribute("aria-label", `${isActive ? "Desativar" : "Ativar"} letra ${letter}`);
+    button.setAttribute(
+      "aria-label",
+      `${isActive ? "Desativar" : "Ativar"} letra ${letter}`,
+    );
     button.addEventListener("click", () => toggleLetter(letter));
     elements.lettersChips.append(button);
   });
@@ -1119,13 +1254,18 @@ function renderLetterOptions() {
 function toggleLetter(letter) {
   if (state.letters.includes(letter)) {
     if (state.letters.length <= MIN_LETTERS) {
-      showLetterFeedback(`Limite minimo atingido: selecione pelo menos ${MIN_LETTERS} letras.`);
+      showLetterFeedback(
+        `Limite minimo atingido: selecione pelo menos ${MIN_LETTERS} letras.`,
+      );
       return;
     }
     state.letters = state.letters.filter((item) => item !== letter);
   } else {
     state.letters.push(letter);
-    state.letters.sort((first, second) => AVAILABLE_LETTERS.indexOf(first) - AVAILABLE_LETTERS.indexOf(second));
+    state.letters.sort(
+      (first, second) =>
+        AVAILABLE_LETTERS.indexOf(first) - AVAILABLE_LETTERS.indexOf(second),
+    );
   }
   renderConfigChips();
   clearLetterFeedback();
@@ -1224,7 +1364,8 @@ function getReviewRemainingSeconds(room) {
   if (!room.review_category_started_at) {
     return 20;
   }
-  const elapsed = Math.floor(Date.now() / 1000) - room.review_category_started_at;
+  const elapsed =
+    Math.floor(Date.now() / 1000) - room.review_category_started_at;
   return Math.max(0, 20 - elapsed);
 }
 
@@ -1235,14 +1376,20 @@ function hasEveryoneVotedCurrentCategory(room) {
   }
 
   const players = Object.keys(room.players);
-  const targetsWithAnswers = players.filter((targetPlayerId) => (room.answers[targetPlayerId]?.[category] || "").trim());
+  const targetsWithAnswers = players.filter((targetPlayerId) =>
+    (room.answers[targetPlayerId]?.[category] || "").trim(),
+  );
   if (targetsWithAnswers.length === 0) {
     return true;
   }
 
   return players.every((voterId) =>
-    targetsWithAnswers
-      .every((targetPlayerId) => Object.prototype.hasOwnProperty.call(room.votes[`${targetPlayerId}:${category}`] || {}, voterId)),
+    targetsWithAnswers.every((targetPlayerId) =>
+      Object.prototype.hasOwnProperty.call(
+        room.votes[`${targetPlayerId}:${category}`] || {},
+        voterId,
+      ),
+    ),
   );
 }
 
@@ -1269,10 +1416,14 @@ async function advanceReviewCategory() {
   if (!ensureRoomAndPlayer()) return;
   if (state.room.status !== "voting") return;
 
-  const response = await request(`/api/v1/rooms/${state.room.id}/review/next`, "POST", {
-    player_id: state.playerId,
-    review_category_index: state.room.review_category_index || 0,
-  });
+  const response = await request(
+    `/api/v1/rooms/${state.room.id}/review/next`,
+    "POST",
+    {
+      player_id: state.playerId,
+      review_category_index: state.room.review_category_index || 0,
+    },
+  );
   state.reviewAdvanceKey = null;
   setRoom(response.data);
 }
@@ -1301,10 +1452,17 @@ function scheduleAutoSave() {
   renderParticipants(state.room);
   updateButtons(state.room);
   clearTimeout(state.saveTimeout);
-  state.saveTimeout = setTimeout(() => runAction(() => submitAnswers(false), true), 600);
+  state.saveTimeout = setTimeout(
+    () => runAction(() => submitAnswers(false), true),
+    600,
+  );
 }
 
-async function runAction(action, silent = false, loadingMessage = "Carregando...") {
+async function runAction(
+  action,
+  silent = false,
+  loadingMessage = "Carregando...",
+) {
   if (!silent) {
     showLoading(loadingMessage);
   }
@@ -1393,7 +1551,8 @@ function renderDevOpsPanel(data) {
   const lastOperation = data.operations?.[0];
   elements.devDsmStatus.textContent = formatDsmStatus(data.dsm.status);
   elements.devRedisStatus.textContent = formatDsmStatus(data.redis.status);
-  elements.devRedisLatency.textContent = data.redis.latencyMs === null ? "-" : `${data.redis.latencyMs}ms`;
+  elements.devRedisLatency.textContent =
+    data.redis.latencyMs === null ? "-" : `${data.redis.latencyMs}ms`;
   elements.devCacheState.textContent = data.dsm.lastCacheStatus || "-";
   elements.devOpsCount.textContent = String(data.operations?.length || 0);
 
@@ -1417,13 +1576,15 @@ function renderDevOpsEvents(data) {
     roomId: operation.roomId,
     createdAt: operation.finishedAt,
   }));
-  const rabbitEvents = (data.rabbitmq?.events || []).slice(0, 6).map((event) => ({
-    source: "RabbitMQ",
-    type: event.type,
-    status: event.status,
-    roomId: event.roomId,
-    createdAt: event.createdAt,
-  }));
+  const rabbitEvents = (data.rabbitmq?.events || [])
+    .slice(0, 6)
+    .map((event) => ({
+      source: "RabbitMQ",
+      type: event.type,
+      status: event.status,
+      roomId: event.roomId,
+      createdAt: event.createdAt,
+    }));
   const events = [...redisEvents, ...rabbitEvents]
     .sort((first, second) => (second.createdAt || 0) - (first.createdAt || 0))
     .slice(0, 10);
@@ -1431,13 +1592,21 @@ function renderDevOpsEvents(data) {
   elements.devEvents.innerHTML = `
     <small>Últimos eventos Redis/RabbitMQ</small>
     <div class="devops-events-list">
-      ${events.length ? events.map((event) => `
+      ${
+        events.length
+          ? events
+              .map(
+                (event) => `
         <div>
           <b>${escapeHtml(event.source)}</b>
           <span>${escapeHtml(event.type)} · ${escapeHtml(event.status)} · ${escapeHtml(event.roomId || "-")}</span>
           <time>${formatEventTime(event.createdAt)}</time>
         </div>
-      `).join("") : "<span>Nenhum evento registrado.</span>"}
+      `,
+              )
+              .join("")
+          : "<span>Nenhum evento registrado.</span>"
+      }
     </div>
   `;
 }
@@ -1454,7 +1623,9 @@ async function copyDiagnostics() {
 }
 
 async function clearRoomCache() {
-  const roomQuery = state.room?.id ? `?room_id=${encodeURIComponent(state.room.id)}` : "";
+  const roomQuery = state.room?.id
+    ? `?room_id=${encodeURIComponent(state.room.id)}`
+    : "";
   const response = await request(`/api/v1/dev/cache/clear${roomQuery}`, "POST");
   alert(response.deleted ? "Cache limpo." : "Nenhuma chave de cache removida.");
 }
