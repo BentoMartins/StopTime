@@ -67,6 +67,30 @@ def test_create_room_and_join_player(monkeypatch) -> None:
     assert "Beto" in data["players"].values()
 
 
+def test_network_info_returns_local_url(monkeypatch) -> None:
+    client = make_client(monkeypatch)
+    monkeypatch.setattr("app.network.get_primary_local_ipv4", lambda: "192.168.1.42")
+
+    response = client.get("/api/v1/network/info")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["ipv4"] == "192.168.1.42"
+    assert data["port"] == 80
+    assert data["baseUrl"] == "http://192.168.1.42:80"
+
+
+def test_network_qr_code_returns_png(monkeypatch) -> None:
+    client = make_client(monkeypatch)
+    monkeypatch.setattr("app.network.get_primary_local_ipv4", lambda: "10.0.0.5")
+
+    response = client.get("/api/v1/network/qr-code", params={"room": "abc123"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
 def test_stop_endpoint_validates_manual_and_accepts_forced_stop(monkeypatch) -> None:
     client = make_client(monkeypatch)
     created = create_room(client)
