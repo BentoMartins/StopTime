@@ -109,6 +109,11 @@
     width: auto;
   }
 
+  .devops-toggle {
+    bottom: 0.75rem;
+    right: 0.75rem;
+  }
+
   .devops-grid,
   .devops-actions {
     grid-template-columns: 1fr;

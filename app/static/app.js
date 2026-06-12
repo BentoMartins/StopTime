@@ -2,10 +2,12 @@ const AVAILABLE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const MIN_CATEGORIES = 5;
 const MAX_CATEGORIES = 20;
 const MIN_LETTERS = 3;
+const queryParams = new URLSearchParams(window.location.search);
 
 const state = {
   room: null,
   playerId: localStorage.getItem("stop.playerId"),
+  roomId: localStorage.getItem("stop.roomId"),
   socket: null,
   categories: ["Nome", "CEP", "Animal", "Comida", "Cor", "Objeto"],
   letters: [...AVAILABLE_LETTERS],
@@ -19,8 +21,8 @@ const state = {
   lastStatus: null,
   stopModalRound: null,
   saveTimeout: null,
-  debugPanel: new URLSearchParams(window.location.search).get("debug") === "1"
-    || localStorage.getItem("stop.debugPanel") === "true",
+  debugPanel: getDebugPanelPreference(),
+  devOpsPanelOpen: localStorage.getItem("stop.debugPanelOpen") === "true",
 };
 
 const elements = {
@@ -73,7 +75,9 @@ const elements = {
   closeStopModalBtn: document.querySelector("#closeStopModalBtn"),
   cancelLeaveRoomBtn: document.querySelector("#cancelLeaveRoomBtn"),
   confirmLeaveRoomBtn: document.querySelector("#confirmLeaveRoomBtn"),
+  devOpsToggle: document.querySelector("#devOpsToggle"),
   devOpsPanel: document.querySelector("#devOpsPanel"),
+  devOpsCloseBtn: document.querySelector("#devOpsCloseBtn"),
   devDsmStatus: document.querySelector("#devDsmStatus"),
   devRedisStatus: document.querySelector("#devRedisStatus"),
   devRedisLatency: document.querySelector("#devRedisLatency"),
@@ -95,6 +99,8 @@ elements.leaveRoomBtn.addEventListener("click", showLeaveRoomModal);
 elements.cancelLeaveRoomBtn.addEventListener("click", hideLeaveRoomModal);
 elements.confirmLeaveRoomBtn.addEventListener("click", () => runAction(leaveRoom));
 elements.copyRoomCodeBtn.addEventListener("click", () => runAction(copyRoomCode));
+elements.devOpsToggle.addEventListener("click", () => setDevOpsPanelOpen(!state.devOpsPanelOpen));
+elements.devOpsCloseBtn.addEventListener("click", () => setDevOpsPanelOpen(false));
 elements.devRefreshBtn.addEventListener("click", () => runAction(refreshDevOpsPanel));
 elements.devForceMissBtn.addEventListener("click", () => runAction(forceCacheMiss));
 elements.devClearCacheBtn.addEventListener("click", () => runAction(clearRoomCache));
@@ -105,12 +111,12 @@ elements.roomCodeInput.addEventListener("input", updateEntryQrCode);
 elements.maxRoundsInput.addEventListener("input", updateMaxRounds);
 elements.roundDurationInput.addEventListener("input", updateRoundDuration);
 elements.chatForms.forEach((form) => form.addEventListener("submit", sendChatMessage));
-window.addEventListener("beforeunload", notifyPlayerLeft);
 
 renderConfigChips();
 applyRoomCodeFromUrl();
 updateEntryQrCode();
 initDevOpsPanel();
+restoreSavedRoom();
 
 async function createRoom() {
   const hostName = requirePlayerName();
@@ -143,11 +149,33 @@ async function joinRoom() {
 }
 
 function applyRoomCodeFromUrl() {
-  const roomId = new URLSearchParams(window.location.search).get("room");
+  const roomId = queryParams.get("room");
   if (!roomId) {
     return;
   }
   elements.roomCodeInput.value = roomId.trim().toUpperCase().slice(0, 6);
+}
+
+async function restoreSavedRoom() {
+  const roomId = queryParams.get("room") || state.roomId;
+  if (!roomId || !state.playerId) {
+    return;
+  }
+
+  try {
+    const response = await request(`/api/v1/rooms/${roomId.trim().toUpperCase()}`);
+    if (!response.data.players[state.playerId]) {
+      clearSavedSession(false);
+      elements.roomCodeInput.value = response.data.id;
+      updateEntryQrCode();
+      return;
+    }
+    setRoom(response.data);
+    connectSocket(response.data.id);
+  } catch {
+    clearSavedSession(false);
+    render();
+  }
 }
 
 function updateEntryQrCode() {
@@ -277,6 +305,8 @@ function setPlayer(playerId) {
 function setRoom(room) {
   const previousStatus = state.room?.status || state.lastStatus;
   state.room = room;
+  state.roomId = room.id;
+  localStorage.setItem("stop.roomId", room.id);
   if (previousStatus === "playing" && room.status === "voting") {
     state.reviewCategoryIndex = 0;
   }
@@ -567,24 +597,8 @@ async function leaveRoom() {
     state.socket.close();
     state.socket = null;
   }
-  state.room = null;
-  state.lastStatus = null;
-  state.stopModalRound = null;
-  state.reviewCategoryIndex = 0;
-  state.playerId = null;
-  localStorage.removeItem("stop.playerId");
+  clearSavedSession();
   render();
-}
-
-function notifyPlayerLeft() {
-  if (!state.room || !state.playerId) {
-    return;
-  }
-
-  fetch(`/api/v1/rooms/${state.room.id}/players/${state.playerId}/leave`, {
-    method: "POST",
-    keepalive: true,
-  });
 }
 
 function updateButtons(room) {
@@ -620,6 +634,21 @@ function showView(viewName) {
   };
   Object.values(views).forEach((view) => view.classList.remove("active"));
   views[viewName].classList.add("active");
+}
+
+function clearSavedSession(clearRoomInput = true) {
+  state.room = null;
+  state.roomId = null;
+  state.lastStatus = null;
+  state.stopModalRound = null;
+  state.reviewCategoryIndex = 0;
+  state.playerId = null;
+  localStorage.removeItem("stop.playerId");
+  localStorage.removeItem("stop.roomId");
+  if (clearRoomInput) {
+    elements.roomCodeInput.value = "";
+    updateEntryQrCode();
+  }
 }
 
 function renderConfigChips() {
@@ -958,15 +987,17 @@ async function runAction(action, silent = false) {
 
 function initDevOpsPanel() {
   if (!state.debugPanel) {
+    elements.devOpsToggle.classList.add("hidden");
+    elements.devOpsPanel.classList.add("hidden");
     return;
   }
   localStorage.setItem("stop.debugPanel", "true");
-  elements.devOpsPanel.classList.remove("hidden");
-  refreshDevOpsPanel(true);
+  elements.devOpsToggle.classList.remove("hidden");
+  setDevOpsPanelOpen(state.devOpsPanelOpen);
 }
 
 async function refreshDevOpsPanel(silent = false) {
-  if (!state.debugPanel) {
+  if (!state.debugPanel || !state.devOpsPanelOpen) {
     return;
   }
   try {
@@ -977,6 +1008,31 @@ async function refreshDevOpsPanel(silent = false) {
       throw error;
     }
   }
+}
+
+function setDevOpsPanelOpen(open) {
+  state.devOpsPanelOpen = open;
+  localStorage.setItem("stop.debugPanelOpen", String(open));
+  elements.devOpsPanel.classList.toggle("hidden", !open);
+  elements.devOpsToggle.setAttribute("aria-expanded", String(open));
+  elements.devOpsToggle.textContent = open ? "Fechar DSM" : "DSM / Cache";
+  if (open) {
+    refreshDevOpsPanel(true);
+  }
+}
+
+function getDebugPanelPreference() {
+  const debugParam = queryParams.get("debug");
+  if (debugParam === "1") {
+    localStorage.setItem("stop.debugPanel", "true");
+    return true;
+  }
+  if (debugParam === "0") {
+    localStorage.removeItem("stop.debugPanel");
+    localStorage.removeItem("stop.debugPanelOpen");
+    return false;
+  }
+  return localStorage.getItem("stop.debugPanel") === "true";
 }
 
 function renderDevOpsPanel(data) {

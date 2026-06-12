@@ -471,6 +471,23 @@
   box-shadow: none;
 }
 
+.devops-toggle {
+  background: #ffbb00;
+  border-radius: 12px;
+  bottom: 1rem;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 28%);
+  color: #041f5f;
+  font-size: 0.85rem;
+  padding: 0.75rem 1rem;
+  position: fixed;
+  right: 1rem;
+  z-index: 9;
+}
+
+.devops-toggle.hidden {
+  display: none;
+}
+
 .devops-panel {
   background: rgb(2 20 65 / 96%);
   border: 1px solid var(--line);
@@ -495,6 +512,7 @@
 .devops-panel header {
   align-items: center;
   display: flex;
+  gap: 0.75rem;
   justify-content: space-between;
 }
 
@@ -508,6 +526,27 @@
 .devops-panel header strong {
   color: #18f2c3;
   font-size: 0.95rem;
+  margin-left: auto;
+}
+
+.devops-close {
+  align-items: center;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 10px;
+  box-shadow: none;
+  color: var(--text);
+  display: inline-flex;
+  font-size: 1.1rem;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  width: 30px;
+}
+
+.devops-close:hover {
+  background: rgb(255 255 255 / 18%);
+  color: var(--text);
 }
 
 .devops-grid {
