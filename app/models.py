@@ -11,7 +11,7 @@ class CreateRoomRequest(BaseModel):
         max_length=20,
     )
     letters: list[str] = Field(default_factory=lambda: list("ABCDEFGHIJKLMNOPQRSTUV"), min_length=3)
-    max_rounds: int = Field(default=6, ge=6, le=15)
+    max_rounds: int = Field(default=6, ge=1, le=15)
     round_duration_seconds: int = Field(default=120, ge=60, le=600)
 
 
@@ -23,7 +23,7 @@ class UpdateRoomRequest(BaseModel):
     player_id: str # NOVO: Necessário para validar quem está fazendo a requisição
     categories: list[str] = Field(min_length=5, max_length=20)
     letters: list[str] = Field(min_length=3, max_length=26)
-    max_rounds: int = Field(ge=6, le=15)
+    max_rounds: int = Field(ge=1, le=15)
     round_duration_seconds: int = Field(ge=60, le=600)
 
 

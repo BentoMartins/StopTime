@@ -52,6 +52,24 @@ def create_room(client: TestClient) -> dict[str, Any]:
     return response.json()
 
 
+def test_create_room_accepts_min_max_rounds(monkeypatch) -> None:
+    client = make_client(monkeypatch)
+
+    response = client.post(
+        "/api/v1/rooms",
+        json={
+            "host_name": "Ana",
+            "categories": ["Nome", "CEP", "Animal", "Comida", "Cor"],
+            "letters": ["A", "B", "C"],
+            "max_rounds": 1,
+            "round_duration_seconds": 60,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["max_rounds"] == 1
+
+
 def test_create_room_and_join_player(monkeypatch) -> None:
     client = make_client(monkeypatch)
 
