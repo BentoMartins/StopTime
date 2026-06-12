@@ -1,4 +1,4 @@
-# Stop Online
+# Stop Time
 
 ## Índice
 
@@ -18,12 +18,12 @@ O servidor mantém o estado global da partida, as regras de rodada, as respostas
 
 ## 2. Conceitos distribuídos usados
 
-| Conceito | Uso no projeto |
-| --- | --- |
-| API REST com FastAPI | Criação de salas, entrada de jogadores, configuração do lobby, respostas, STOP, votação e finalização da rodada. |
-| Cache distribuído com Redis | Armazena o estado global das salas em chaves `stop:room:{id}`. |
-| Mensageria com RabbitMQ | Publica eventos da aplicação, como `room.created`, `room.round_started`, `room.stopped` e `room.round_finished`. |
-| WebSocket | Atualiza todos os jogadores da sala em tempo real quando o estado muda. |
+| Conceito                    | Uso no projeto                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| API REST com FastAPI        | Criação de salas, entrada de jogadores, configuração do lobby, respostas, STOP, votação e finalização da rodada. |
+| Cache distribuído com Redis | Armazena o estado global das salas em chaves `stop:room:{id}`.                                                   |
+| Mensageria com RabbitMQ     | Publica eventos da aplicação, como `room.created`, `room.round_started`, `room.stopped` e `room.round_finished`. |
+| WebSocket                   | Atualiza todos os jogadores da sala em tempo real quando o estado muda.                                          |
 
 ### Cache-Aside / DSM
 
@@ -40,15 +40,15 @@ Fluxo de leitura:
 
 Variaveis suportadas:
 
-| Variavel | Padrao | Uso |
-| --- | --- | --- |
-| `REDIS_URL` | `redis://localhost:6379/0` | Conexao com Redis. |
-| `CACHE_ENABLED` | `true` | Liga/desliga a camada Redis. |
-| `CACHE_TTL` | `3600` | Tempo de vida das salas no cache, em segundos. |
-| `CACHE_PREFIX` | `stop` | Prefixo das chaves no Redis. |
-| `CACHE_FALLBACK_ENABLED` | `true` | Mantem fallback local em caso de miss/falha. |
-| `DSM_PANEL_ENABLED` | `true` | Habilita endpoints do painel dev/ops. |
-| `DSM_DEBUG_TOKEN` | vazio | Quando definido, exige header `X-Dsm-Token`. |
+| Variavel                 | Padrao                     | Uso                                            |
+| ------------------------ | -------------------------- | ---------------------------------------------- |
+| `REDIS_URL`              | `redis://localhost:6379/0` | Conexao com Redis.                             |
+| `CACHE_ENABLED`          | `true`                     | Liga/desliga a camada Redis.                   |
+| `CACHE_TTL`              | `3600`                     | Tempo de vida das salas no cache, em segundos. |
+| `CACHE_PREFIX`           | `stop`                     | Prefixo das chaves no Redis.                   |
+| `CACHE_FALLBACK_ENABLED` | `true`                     | Mantem fallback local em caso de miss/falha.   |
+| `DSM_PANEL_ENABLED`      | `true`                     | Habilita endpoints do painel dev/ops.          |
+| `DSM_DEBUG_TOKEN`        | vazio                      | Quando definido, exige header `X-Dsm-Token`.   |
 
 Painel dev/ops:
 
@@ -64,7 +64,7 @@ Painel dev/ops:
 flowchart LR
     Jogador[Jogador no navegador] --> Cliente[HTML CSS JS]
     Cliente -->|REST /api/v1| API[FastAPI]
-    Cliente <-->|WebSocket /ws/rooms/{id}| API
+    Cliente <-->|WebSocket /ws/rooms/ID| API
     API -->|estado da sala| Redis[(Redis)]
     API -->|eventos de dominio| RabbitMQ[(RabbitMQ)]
 ```
@@ -94,7 +94,7 @@ Se aparecer erro com `dockerDesktopLinuxEngine`, o Docker Desktop ainda não ini
 2. Entre na pasta do projeto:
 
 ```powershell
-cd C:\Users\User\Downloads\github\StopTime
+cd StopTime
 ```
 
 3. Suba Redis e RabbitMQ:
@@ -120,7 +120,7 @@ python -m pip install -r requirements.txt
 6. Execute a aplicação na porta recomendada:
 
 ```powershell
-python -m uvicorn app.main:app --reload --port 8001
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 7. Acesse:
@@ -133,7 +133,7 @@ python -m uvicorn app.main:app --reload --port 8001
 Se a porta `8001` estiver ocupada, use outra:
 
 ```powershell
-python -m uvicorn app.main:app --reload --port 8002
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
 ```
 
 Para descobrir quem está usando uma porta:
@@ -161,28 +161,28 @@ Stop-Process -Id NUMERO_DO_PID
 9. Na votação, os participantes validam ou invalidam as respostas dos colegas.
 10. Ao finalizar a rodada, o servidor calcula:
 
-| Regra | Pontuação |
-| --- | --- |
-| Palavra válida e única | 10 pontos |
-| Palavra válida repetida | 5 pontos |
-| Palavra inválida, em branco ou com letra errada | 0 pontos |
+| Regra                                           | Pontuação |
+| ----------------------------------------------- | --------- |
+| Palavra válida e única                          | 10 pontos |
+| Palavra válida repetida                         | 5 pontos  |
+| Palavra inválida, em branco ou com letra errada | 0 pontos  |
 
 Depois da pontuação, o sistema mostra o pódio da rodada. O botão **Nova rodada** retorna para a etapa de preenchimento com uma nova letra. A sala segue assim até algum jogador atingir **100 pontos**, quando o vencedor é exibido e novas rodadas são bloqueadas.
 
 ## 6. Principais endpoints
 
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `POST` | `/api/v1/rooms` | Cria sala. |
-| `GET` | `/api/v1/rooms/{roomId}` | Consulta estado da sala. |
-| `POST` | `/api/v1/rooms/{roomId}/players` | Entra em uma sala. |
-| `PATCH` | `/api/v1/rooms/{roomId}` | Atualiza categorias e letras no lobby. |
-| `POST` | `/api/v1/rooms/{roomId}/rounds` | Inicia rodada e sorteia letra. |
-| `POST` | `/api/v1/rooms/{roomId}/answers` | Salva respostas do jogador. |
-| `POST` | `/api/v1/rooms/{roomId}/stop` | Encerra a rodada e abre votação. |
-| `POST` | `/api/v1/rooms/{roomId}/votes` | Registra voto de validação. |
-| `POST` | `/api/v1/rooms/{roomId}/finish` | Calcula pontuação da rodada. |
-| `WS` | `/ws/rooms/{roomId}` | Atualizações em tempo real. |
+| Método  | Rota                             | Descrição                              |
+| ------- | -------------------------------- | -------------------------------------- |
+| `POST`  | `/api/v1/rooms`                  | Cria sala.                             |
+| `GET`   | `/api/v1/rooms/{roomId}`         | Consulta estado da sala.               |
+| `POST`  | `/api/v1/rooms/{roomId}/players` | Entra em uma sala.                     |
+| `PATCH` | `/api/v1/rooms/{roomId}`         | Atualiza categorias e letras no lobby. |
+| `POST`  | `/api/v1/rooms/{roomId}/rounds`  | Inicia rodada e sorteia letra.         |
+| `POST`  | `/api/v1/rooms/{roomId}/answers` | Salva respostas do jogador.            |
+| `POST`  | `/api/v1/rooms/{roomId}/stop`    | Encerra a rodada e abre votação.       |
+| `POST`  | `/api/v1/rooms/{roomId}/votes`   | Registra voto de validação.            |
+| `POST`  | `/api/v1/rooms/{roomId}/finish`  | Calcula pontuação da rodada.           |
+| `WS`    | `/ws/rooms/{roomId}`             | Atualizações em tempo real.            |
 
 ## 7. Roteiro para apresentação
 
@@ -194,6 +194,7 @@ Depois da pontuação, o sistema mostra o pódio da rodada. O botão **Nova roda
 6. Finalizar rodada e mostrar a pontuação.
 7. Abrir RabbitMQ Management e mostrar a fila `stop.events.audit`.
 8. Explicar concorrência simples: o servidor centraliza o estado no Redis e propaga alterações via WebSocket.
+
 ## 8. Checklist de validacao da demo
 
 Antes da apresentacao, rode este fluxo completo:
@@ -207,7 +208,7 @@ docker compose up -d
 2. Inicie a API:
 
 ```bash
-python -m uvicorn app.main:app --reload --port 8001
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 3. Abra o jogo em duas janelas ou navegadores:

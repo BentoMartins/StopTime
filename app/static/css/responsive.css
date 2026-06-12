@@ -34,7 +34,7 @@
   .demo-grid,
   .chat-form,
   .lobby-header,
-    .lobby-start-card {
+  .lobby-start-card {
     grid-template-columns: 1fr;
   }
 
@@ -83,12 +83,59 @@
     justify-items: center;
   }
 
+  /* Mostrar botão de saída também em telas pequenas (antes estava oculto) */
   .lobby-exit-btn {
-    display: none;
+    display: inline-flex;
+    position: relative;
   }
 
   .lobby-logo {
     width: min(260px, 80vw);
+  }
+
+  /* Centraliza logo e posiciona botão de saída em canto no mobile */
+  .lobby-header {
+    position: relative;
+  }
+
+  .lobby-logo {
+    margin-left: 0;
+    justify-self: center;
+    align-self: center;
+  }
+
+  .lobby-exit-btn {
+    display: inline-flex;
+    position: absolute;
+    left: 0.6rem;
+    top: 0.6rem;
+    z-index: 20;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .game-topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem;
+  }
+
+  .game-topbar .lobby-exit-btn,
+  .game-topbar .lobby-exit-btn span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .game-topbar .lobby-exit-btn {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    left: 0;
+    top: 0;
   }
 
   .room-code {

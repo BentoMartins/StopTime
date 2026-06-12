@@ -19,15 +19,27 @@
 .entry-logo {
   display: grid;
   justify-items: center;
-  margin-top: -4rem;
+  margin-top: -2.4rem;
   margin-bottom: 1.25rem;
 }
 
 .stop-time-icon {
   display: block;
-  filter: drop-shadow(0 16px 26px rgb(0 0 0 / 28%)) drop-shadow(0 0 22px rgb(29 155 240 / 52%));
-  max-width: min(380px, 100vw);
-  width: 100%;
+  filter: drop-shadow(0 16px 26px rgb(0 0 0 / 28%))
+    drop-shadow(0 0 22px rgb(29 155 240 / 52%));
+  max-width: min(240px, 76vw);
+  width: auto;
+  height: auto;
+}
+
+@media (max-width: 520px) {
+  .entry-logo {
+    margin-top: -1.2rem;
+  }
+
+  .stop-time-icon {
+    max-width: min(200px, 72vw);
+  }
 }
 
 .entry-subtitle {

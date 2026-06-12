@@ -30,6 +30,21 @@
   min-height: 64px;
 }
 
+/* ensure exit button is positioned outside header box */
+.lobby-header {
+  position: relative;
+}
+
+.lobby-header .lobby-exit-btn {
+  position: absolute;
+  left: 0.8rem;
+  top: -18px;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
 .lobby-exit-btn {
   align-items: center;
   background: rgb(255 255 255 / 14%);
@@ -208,8 +223,10 @@
 .lobby-rounds-field select {
   appearance: none;
   background:
-    linear-gradient(45deg, transparent 50%, #1df5d0 50%) calc(100% - 1.12rem) 50% / 0.42rem 0.42rem no-repeat,
-    linear-gradient(135deg, #1df5d0 50%, transparent 50%) calc(100% - 0.84rem) 50% / 0.42rem 0.42rem no-repeat,
+    linear-gradient(45deg, transparent 50%, #1df5d0 50%) calc(100% - 1.12rem)
+      50% / 0.42rem 0.42rem no-repeat,
+    linear-gradient(135deg, #1df5d0 50%, transparent 50%) calc(100% - 0.84rem)
+      50% / 0.42rem 0.42rem no-repeat,
     rgb(255 255 255 / 10%);
   border: 1px solid rgb(255 255 255 / 16%);
   border-radius: 999px;
@@ -320,7 +337,11 @@
 
 .chip {
   align-items: center;
-  background: linear-gradient(180deg, rgb(255 255 255 / 88%), rgb(215 228 255 / 88%));
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 88%),
+    rgb(215 228 255 / 88%)
+  );
   border: 1px solid rgb(255 255 255 / 52%);
   border-radius: 999px;
   box-shadow:
@@ -397,7 +418,10 @@
   justify-content: center;
   line-height: 1;
   padding: 0;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
   width: 1.15rem;
 }
 
