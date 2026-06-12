@@ -232,6 +232,7 @@ function updateEntryQrCode() {
 async function saveConfig() {
   if (!state.room) return alert("Crie ou entre em uma sala.");
   const response = await request(`/api/v1/rooms/${state.room.id}`, "PATCH", {
+    player_id: state.playerId, // NOVO: Informa o ID do jogador atual para o backend
     categories: state.categories,
     letters: state.letters,
     max_rounds: getMaxRounds(),
@@ -401,6 +402,15 @@ function setPlayer(playerId) {
   localStorage.setItem("stop.playerId", playerId);
 }
 
+function updateConfigPermissions(room) {
+  const isHost = room.host_id === state.playerId;
+  
+  elements.maxRoundsInput.disabled = !isHost;
+  elements.roundDurationInput.disabled = !isHost;
+  elements.categoryInput.disabled = !isHost;
+  elements.addCategoryBtn.disabled = !isHost;
+}
+
 function setRoom(room) {
   const previousStatus = state.room?.status || state.lastStatus;
   state.room = room;
@@ -439,7 +449,9 @@ function render() {
   elements.lobbyRoomCode.textContent = room.id;
   elements.lobbyRoundNumber.textContent = `${room.round_number || 0}/${state.maxRounds}`;
   elements.lobbyPlayerCount.textContent = Object.keys(room.players).length;
+  
   renderConfigChips();
+  updateConfigPermissions(room); // NOVO: Chama a trava visual aqui
 
   renderCurrentView(room);
   renderAnswers(room);
@@ -929,6 +941,8 @@ function renderChips(container, values, onAction) {
     return;
   }
 
+  const isHost = state.room?.host_id === state.playerId; // NOVO: Bloqueio do Líder
+
   values.forEach((value) => {
     const chip = document.createElement("span");
     chip.className = "chip";
@@ -937,6 +951,7 @@ function renderChips(container, values, onAction) {
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "chip-remove";
+    removeButton.disabled = !isHost; // NOVO: Desativa o botão se não for líder
     removeButton.setAttribute("aria-label", `Remover ${value}`);
     removeButton.innerHTML = `
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -970,6 +985,7 @@ function addCategory() {
   state.categories.push(category);
   elements.categoryInput.value = "";
   renderConfigChips();
+  runAction(() => saveConfig(), true); // NOVO: Salva no servidor
   if (state.categories.length === MAX_CATEGORIES) {
     showCategoryFeedback(`Limite maximo atingido: ${MAX_CATEGORIES} temas.`, "success");
     return;
@@ -980,11 +996,13 @@ function addCategory() {
 function updateMaxRounds() {
   state.maxRounds = getMaxRounds();
   elements.maxRoundsInput.value = state.maxRounds;
+  runAction(() => saveConfig(), true); // NOVO: Salva no servidor
 }
 
 function updateRoundDuration() {
   state.roundDurationSeconds = getRoundDurationSeconds();
   elements.roundDurationInput.value = state.roundDurationSeconds;
+  runAction(() => saveConfig(), true); // NOVO: Salva no servidor
 }
 
 function getMaxRounds() {
@@ -1011,16 +1029,20 @@ function removeCategory(category) {
   state.categories = state.categories.filter((item) => item !== category);
   renderConfigChips();
   clearCategoryFeedback();
+  runAction(() => saveConfig(), true); // NOVO: Salva no servidor
 }
 
 function renderLetterOptions() {
   elements.lettersChips.innerHTML = "";
+  const isHost = state.room?.host_id === state.playerId; // NOVO: Bloqueio do Líder
+
   AVAILABLE_LETTERS.forEach((letter) => {
     const isActive = state.letters.includes(letter);
     const button = document.createElement("button");
     button.type = "button";
     button.className = `letter-option${isActive ? " active" : " inactive"}`;
     button.textContent = letter;
+    button.disabled = !isHost; // NOVO: Desativa clique se não for líder
     button.setAttribute("aria-pressed", String(isActive));
     button.setAttribute("aria-label", `${isActive ? "Desativar" : "Ativar"} letra ${letter}`);
     button.addEventListener("click", () => toggleLetter(letter));
@@ -1041,6 +1063,7 @@ function toggleLetter(letter) {
   }
   renderConfigChips();
   clearLetterFeedback();
+  runAction(() => saveConfig(), true); // NOVO: Salva no servidor
 }
 
 function addChipOnEnter(event, callback) {

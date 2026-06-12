@@ -20,6 +20,7 @@ class JoinRoomRequest(BaseModel):
 
 
 class UpdateRoomRequest(BaseModel):
+    player_id: str # NOVO: Necessário para validar quem está fazendo a requisição
     categories: list[str] = Field(min_length=5, max_length=20)
     letters: list[str] = Field(min_length=3, max_length=26)
     max_rounds: int = Field(ge=6, le=15)

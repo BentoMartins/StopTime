@@ -63,6 +63,15 @@ class GameService:
 
     async def update_room(self, room_id: str, request: UpdateRoomRequest) -> dict[str, Any]:
         room = await self.require_room(room_id)
+        
+        # NOVA VALIDAÇÃO: Verifica se o jogador existe na sala e se ele é o líder
+        self._require_player(room, request.player_id)
+        if request.player_id != room.get("host_id"):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, 
+                "Apenas o líder da sala pode alterar as configurações."
+            )
+
         if room["status"] != "lobby":
             raise HTTPException(status.HTTP_409_CONFLICT, "Configuracoes so podem mudar no lobby.")
 
