@@ -112,22 +112,23 @@ class GameService:
         await self.store.save_room(room)
         return room
 
-    async def stop_round(self, room_id: str, player_id: str, answers: dict[str, str]) -> dict[str, Any]:
+    async def stop_round(self, room_id: str, player_id: str, answers: dict[str, str], force: bool = False) -> dict[str, Any]:
         room = await self.require_room(room_id)
         self._require_playing(room)
         self._require_player(room, player_id)
         filtered_answers = self._filter_answers(room["categories"], answers)
-        if not all(filtered_answers[category] for category in room["categories"]):
+        if not force and not all(filtered_answers[category] for category in room["categories"]):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Preencha todos os campos antes de pedir STOP.")
 
         room["answers"][player_id] = filtered_answers
         room["status"] = "voting"
-        room["stopped_by"] = player_id
+        room["stopped_by"] = None if force else player_id
         room["votes"] = self._build_initial_votes(room)
         room["review_category_index"] = 0
         room["review_category_started_at"] = int(time.time())
         player_name = room["players"].get(player_id, "Um jogador")
-        self._append_event(room, "system", f"{player_name} pediu STOP.", player_id)
+        message = "Tempo esgotado. Rodada encerrada automaticamente." if force else f"{player_name} pediu STOP."
+        self._append_event(room, "system", message, player_id)
         await self.store.save_room(room)
         return room
 
@@ -206,6 +207,25 @@ class GameService:
         self._require_player(room, player_id)
         player_name = room["players"].get(player_id, "Um jogador")
         self._append_event(room, "system", f"{player_name} saiu da sala.", player_id)
+        room["players"].pop(player_id, None)
+        room["scores"].pop(player_id, None)
+        room["answers"].pop(player_id, None)
+        room["last_round_scores"].pop(player_id, None)
+        room["votes"] = {
+            vote_key: {
+                voter_id: valid
+                for voter_id, valid in votes.items()
+                if voter_id == "system" or voter_id != player_id
+            }
+            for vote_key, votes in room["votes"].items()
+            if not vote_key.startswith(f"{player_id}:")
+        }
+        if room.get("host_id") == player_id:
+            room["host_id"] = next(iter(room["players"]), None)
+        if room.get("stopped_by") == player_id:
+            room["stopped_by"] = None
+        if room.get("winner_id") == player_id:
+            room["winner_id"] = self._find_winner(room) if room["players"] else None
         await self.store.save_room(room)
         return room
 

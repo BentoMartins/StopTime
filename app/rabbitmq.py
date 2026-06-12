@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 import aio_pika
-from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractExchange
+from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractExchange, AbstractIncomingMessage, AbstractQueue
 
 from app.config import settings
 
@@ -15,6 +15,7 @@ class RabbitPublisher:
         self.connection: AbstractConnection | None = None
         self.channel: AbstractChannel | None = None
         self.exchange: AbstractExchange | None = None
+        self.audit_queue: AbstractQueue | None = None
 
     async def connect(self) -> None:
         try:
@@ -25,8 +26,9 @@ class RabbitPublisher:
                 aio_pika.ExchangeType.TOPIC,
                 durable=True,
             )
-            queue = await self.channel.declare_queue(settings.rabbitmq_queue, durable=True)
-            await queue.bind(self.exchange, routing_key="room.*")
+            self.audit_queue = await self.channel.declare_queue(settings.rabbitmq_queue, durable=True)
+            await self.audit_queue.bind(self.exchange, routing_key="room.*")
+            await self.audit_queue.consume(self.consume_audit_event)
             logger.info("RabbitMQ conectado e fila de auditoria configurada.")
         except Exception:
             logger.exception("RabbitMQ indisponivel. A API continua funcionando sem publicar eventos.")
@@ -41,6 +43,11 @@ class RabbitPublisher:
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
         await self.exchange.publish(message, routing_key=event_type)
+
+    async def consume_audit_event(self, message: AbstractIncomingMessage) -> None:
+        async with message.process():
+            payload = json.loads(message.body.decode("utf-8"))
+            logger.info("Evento processado assincronamente: %s", payload.get("type"))
 
     async def close(self) -> None:
         if self.connection is not None:
