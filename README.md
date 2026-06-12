@@ -64,7 +64,7 @@ Painel dev/ops:
 flowchart LR
     Jogador[Jogador no navegador] --> Cliente[HTML CSS JS]
     Cliente -->|REST /api/v1| API[FastAPI]
-    Cliente <-->|WebSocket /ws/rooms/{id}| API
+    Cliente <-->|WebSocket /ws/rooms/ID| API
     API -->|estado da sala| Redis[(Redis)]
     API -->|eventos de dominio| RabbitMQ[(RabbitMQ)]
 ```
