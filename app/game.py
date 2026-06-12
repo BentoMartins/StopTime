@@ -176,7 +176,7 @@ class GameService:
         room = await self.require_room(room_id)
         self._require_player(room, player_id)
         if room["status"] != "voting":
-            raise HTTPException(status.HTTP_409_CONFLICT, "Pontuacao so pode ser calculada na votacao.")
+            raise HTTPException(status.HTTP_409_CONFLICT, "Pontuação só pode ser calculada na votação.")
 
         score_delta = self._calculate_score(room)
         for player, score in score_delta.items():
@@ -190,7 +190,7 @@ class GameService:
             winner_name = room["players"].get(room["winner_id"], "Um jogador")
             self._append_event(room, "system", f"{winner_name} venceu a sala.", room["winner_id"])
         else:
-            self._append_event(room, "system", "Rodada concluida. Pontuacao atualizada.", player_id)
+            self._append_event(room, "system", "Rodada concluída. Pontuação atualizada.", player_id)
         await self.store.save_room(room)
         return room
 
