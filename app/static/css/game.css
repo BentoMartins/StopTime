@@ -409,10 +409,12 @@
 .podium-item.position-1 {
   background: #fff;
   border-color: var(--text);
+  color: #041f5f;
 }
 
 .podium-item.position-1 span {
   background: var(--accent);
+  color: #041f5f;
 }
 
 .podium-item strong {
@@ -421,6 +423,10 @@
 
 .podium-item small {
   color: var(--muted);
+}
+
+.podium-item.position-1 small {
+  color: #3567b8;
 }
 
 .podium-actions {
